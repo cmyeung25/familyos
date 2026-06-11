@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const serviceMode = String(process.argv[2] || process.env.FAMILY_OS_SERVICE_MODE || "bot").trim().toLowerCase();
@@ -21,6 +21,7 @@ const defaultReminderConfigPath = path.join(defaultExampleRoot, "config", "remin
 
 initializeEnvironment();
 ensureDirectories();
+installExtraCertificatesIfPresent();
 
 switch (serviceMode) {
   case "bot":
@@ -74,6 +75,40 @@ function initializeEnvironment() {
       }),
   );
   process.env.PATH = `${path.join(botRoot, "node_modules", ".bin")}${path.delimiter}${process.env.PATH || ""}`;
+}
+
+function installExtraCertificatesIfPresent() {
+  const certsRoot = path.join(defaultInstanceRoot, "secrets", "certs");
+  if (!fs.existsSync(certsRoot)) {
+    return;
+  }
+
+  const certFiles = fs.readdirSync(certsRoot)
+    .filter((name) => name.toLowerCase().endsWith(".crt"))
+    .map((name) => path.join(certsRoot, name));
+
+  if (!certFiles.length) {
+    return;
+  }
+
+  const installRoot = "/usr/local/share/ca-certificates/family-os";
+  fs.mkdirSync(installRoot, { recursive: true });
+
+  for (const certPath of certFiles) {
+    const targetPath = path.join(installRoot, path.basename(certPath));
+    fs.copyFileSync(certPath, targetPath);
+  }
+
+  process.env.NODE_EXTRA_CA_CERTS = certFiles[0];
+
+  try {
+    const result = spawnSyncSafe("update-ca-certificates", ["--fresh"]);
+    if (result.status !== 0) {
+      console.warn(`update-ca-certificates failed with status ${result.status}. Extra certs may not be active.`);
+    }
+  } catch (error) {
+    console.warn(`Failed to refresh CA certificates: ${error.message}`);
+  }
 }
 
 function preferConfigFile(fileName, fallbackPath, { legacyFallbackPath = "" } = {}) {
@@ -153,6 +188,14 @@ function runNodeScript(scriptName, { nodeArgs = [], scriptArgs = [] } = {}) {
       }
       resolve();
     });
+  });
+}
+
+function spawnSyncSafe(command, args) {
+  return spawnSync(command, args, {
+    cwd: botRoot,
+    env: process.env,
+    stdio: "inherit",
   });
 }
 

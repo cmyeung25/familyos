@@ -18,7 +18,6 @@ services:
       FAMILY_OS_API_CONFIG_PATH: /data/instance/secrets/local-api-config.json
       FAMILY_OS_REMINDER_CONFIG_PATH: /data/instance/config/reminder-config.json
       FAMILY_OS_RUNTIME_CONFIG_PATH: /data/instance/config/telegram-runtime.json
-      NODE_TLS_REJECT_UNAUTHORIZED: "0"
     volumes:
       - ./instances/gary:/data/instance
       - ./instances/gary:/app/instances/gary
@@ -50,7 +49,6 @@ services:
       FAMILY_OS_API_CONFIG_PATH: /data/instance/secrets/local-api-config.json
       FAMILY_OS_REMINDER_CONFIG_PATH: /data/instance/config/reminder-config.json
       FAMILY_OS_RUNTIME_CONFIG_PATH: /data/instance/config/telegram-runtime.json
-      NODE_TLS_REJECT_UNAUTHORIZED: "0"
     volumes:
       - ./instances/gary:/data/instance
       - ./instances/gary:/app/instances/gary
