@@ -9,10 +9,6 @@ services:
     environment:
       FAMILY_OS_SERVICE_MODE: bot
       FAMILY_OS_HEALTHCHECK_MODE: bot
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS:-}
-      FAMILY_OS_API_URL: ${FAMILY_OS_API_URL}
-      FAMILY_OS_API_KEY: ${FAMILY_OS_API_KEY}
     volumes:
       - ./instances/example:/data/instance
     restart: unless-stopped
@@ -33,9 +29,6 @@ services:
     environment:
       FAMILY_OS_SERVICE_MODE: reminder
       FAMILY_OS_HEALTHCHECK_MODE: reminder
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      FAMILY_OS_API_URL: ${FAMILY_OS_API_URL}
-      FAMILY_OS_API_KEY: ${FAMILY_OS_API_KEY}
     volumes:
       - ./instances/example:/data/instance
     restart: unless-stopped
