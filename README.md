@@ -1,0 +1,36 @@
+# Family OS
+
+Family OS is a household assistant workspace built around a Telegram bot, a Codex bridge, and a Google Apps Script API backed by Google Sheets.
+
+## Current layout
+
+- `family-os-telegram-bot/`: Telegram bot runtime, Codex bridge, reminder worker
+- `family-os-apps-script/`: Apps Script Web App backend for audited reads and writes
+- `plugins-staging/`: staged skills and runtime references used by the Telegram BB + inventory flow
+- `instances/example/`: Phase 1 multi-instance config scaffold
+
+## Phase 1 status
+
+Phase 1 introduces instance-aware paths without changing core bot behavior:
+
+- existing local defaults still work
+- runtime state, logs, reminder config, and Codex auth can now be redirected with env vars
+- each future household instance can point to its own config, state, logs, and runtime knowledge root
+
+The current code still uses the same shared business logic and the same Google Sheets API contract.
+
+## Instance path envs
+
+The bot now supports these path overrides:
+
+- `FAMILY_OS_INSTANCE_ROOT`
+- `FAMILY_OS_CONFIG_ROOT`
+- `FAMILY_OS_STATE_ROOT`
+- `FAMILY_OS_LOGS_ROOT`
+- `FAMILY_OS_CODEX_HOME`
+- `FAMILY_OS_BOT_CONFIG_PATH`
+- `FAMILY_OS_API_CONFIG_PATH`
+- `FAMILY_OS_REMINDER_CONFIG_PATH`
+- `FAMILY_OS_RUNTIME_CONFIG_PATH`
+
+See [instances/example/README.md](/C:/Users/user/OneDrive/文件/屋企清單/instances/example/README.md) for a tenant-style scaffold.

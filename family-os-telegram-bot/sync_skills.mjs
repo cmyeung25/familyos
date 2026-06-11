@@ -1,13 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const workspace = path.resolve(scriptDir, "..");
+const runtimePaths = resolveFamilyOsPaths();
+ensureRuntimeDirectories(runtimePaths);
+const workspace = runtimePaths.workspaceRoot;
 const pluginRoot = path.join(workspace, "plugins-staging", "family-os-bb-inventory");
 const sourceRoot = path.join(pluginRoot, "skills");
-const runtimeConfigPath = path.join(pluginRoot, "runtime", "telegram-runtime.json");
-const targetRoot = path.join(workspace, ".agents", "skills");
+const runtimeConfigPath = runtimePaths.runtimeConfigPath;
+const targetRoot = runtimePaths.skillsRoot;
 const skillNames = readSkillNames(runtimeConfigPath);
 
 fs.mkdirSync(targetRoot, { recursive: true });

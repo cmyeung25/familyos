@@ -6,6 +6,10 @@ if ($processPath) {
     [Environment]::SetEnvironmentVariable("Path", $processPath, "Process")
 }
 
+. (Join-Path $PSScriptRoot "instance-paths.ps1")
+$paths = Get-FamilyOsBotPaths -ScriptRoot $PSScriptRoot
+Initialize-FamilyOsBotRuntime -Paths $paths
+
 function Sync-CodexAuth([string]$SeedAuthPath, [string]$LocalAuthPath) {
     if (-not (Test-Path -LiteralPath $SeedAuthPath)) {
         return
@@ -46,6 +50,7 @@ writable_roots = ['$WorkspaceRoot']
 }
 
 function Reset-LogFile([string]$Path) {
+    Ensure-FamilyOsParentDirectory -Path $Path
     Set-Content -LiteralPath $Path -Value "" -Encoding utf8
 }
 
@@ -58,6 +63,7 @@ function Get-SupervisorMode {
 
 function Write-SupervisorLog([string]$Path, [string]$Message) {
     $timestamp = Get-Date -Format o
+    Ensure-FamilyOsParentDirectory -Path $Path
     Add-Content -LiteralPath $Path -Encoding utf8 -Value "[$timestamp] $Message"
 }
 
@@ -79,13 +85,12 @@ function Write-SupervisorState(
         last_bot_exit_code = $LastBotExitCode
         active_bot_pid = $ActiveBotPid
     }
+    Ensure-FamilyOsParentDirectory -Path $Path
     $payload | ConvertTo-Json | Set-Content -LiteralPath $Path -Encoding utf8
 }
 
-$localCodexHome = Join-Path $PSScriptRoot ".codex-home"
-New-Item -ItemType Directory -Force -Path $localCodexHome | Out-Null
-$env:CODEX_HOME = $localCodexHome
-$workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$localCodexHome = $paths.CodexHome
+$workspaceRoot = $paths.WorkspaceRoot
 
 $seedCodexHome = Join-Path $env:USERPROFILE ".codex"
 $seedAuthPath = Join-Path $seedCodexHome "auth.json"
@@ -155,7 +160,7 @@ foreach ($name in @(
     Import-UserEnvironmentVariable $name
 }
 
-$botConfigPath = Join-Path $PSScriptRoot "local-bot-config.json"
+$botConfigPath = $paths.BotConfigPath
 if (Test-Path -LiteralPath $botConfigPath) {
     $botConfig = Get-Content -LiteralPath $botConfigPath -Encoding utf8 -Raw | ConvertFrom-Json
     if (-not $env:TELEGRAM_BOT_TOKEN -and $botConfig.telegram_bot_token_dpapi) {
@@ -173,7 +178,7 @@ if (Test-Path -LiteralPath $botConfigPath) {
     }
 }
 
-$apiConfigPath = Join-Path $PSScriptRoot "..\family-os-apps-script\local-api-config.json"
+$apiConfigPath = $paths.ApiConfigPath
 if ((-not $env:FAMILY_OS_API_URL -or -not $env:FAMILY_OS_API_KEY) -and (Test-Path -LiteralPath $apiConfigPath)) {
     $config = Get-Content -LiteralPath $apiConfigPath -Encoding utf8 -Raw | ConvertFrom-Json
     if (-not $env:FAMILY_OS_API_URL) {
@@ -217,15 +222,18 @@ if ($env:FAMILY_OS_BOT_CHECK_ONLY -eq "1") {
 Ensure-ReminderSupervisor -BotScriptRoot $PSScriptRoot
 
 if ($env:FAMILY_OS_BOT_DETACH -eq "1" -and $env:FAMILY_OS_BOT_SUPERVISOR -ne "1") {
-    $stdoutPath = Join-Path $PSScriptRoot "bot-runtime.out.log"
-    $stderrPath = Join-Path $PSScriptRoot "bot-runtime.err.log"
-    $supervisorStatePath = Join-Path $PSScriptRoot "bot-supervisor-state.json"
-    $supervisorLogPath = Join-Path $PSScriptRoot "bot-supervisor.log"
-    $supervisorOutPath = Join-Path $PSScriptRoot "bot-supervisor.out.log"
-    $supervisorErrPath = Join-Path $PSScriptRoot "bot-supervisor.err.log"
+    $stdoutPath = $paths.BotRuntimeOutPath
+    $stderrPath = $paths.BotRuntimeErrPath
+    $supervisorStatePath = $paths.BotSupervisorStatePath
+    $supervisorLogPath = $paths.BotSupervisorLogPath
+    $supervisorOutPath = $paths.BotSupervisorOutPath
+    $supervisorErrPath = $paths.BotSupervisorErrPath
     foreach ($logPath in @($stdoutPath, $stderrPath, $supervisorOutPath, $supervisorErrPath)) {
+        Ensure-FamilyOsParentDirectory -Path $logPath
         Reset-LogFile -Path $logPath
     }
+    Ensure-FamilyOsParentDirectory -Path $supervisorStatePath
+    Ensure-FamilyOsParentDirectory -Path $supervisorLogPath
     Write-SupervisorLog -Path $supervisorLogPath -Message "Launching hidden background supervisor."
 
     $scriptPath = $PSCommandPath.Replace("'", "''")
@@ -247,7 +255,40 @@ if ($env:FAMILY_OS_BOT_DETACH -eq "1" -and $env:FAMILY_OS_BOT_SUPERVISOR -ne "1"
         "TELEGRAM_ALLOWED_USER_IDS",
         "FAMILY_OS_API_URL",
         "FAMILY_OS_API_KEY",
-        "CODEX_HOME"
+        "CODEX_HOME",
+        "FAMILY_OS_WORKSPACE",
+        "FAMILY_OS_INSTANCE_ROOT",
+        "FAMILY_OS_CONFIG_ROOT",
+        "FAMILY_OS_STATE_ROOT",
+        "FAMILY_OS_LOGS_ROOT",
+        "FAMILY_OS_CODEX_HOME",
+        "FAMILY_OS_SKILLS_ROOT",
+        "FAMILY_OS_RUNTIME_CONFIG_PATH",
+        "FAMILY_OS_BOT_CONFIG_PATH",
+        "FAMILY_OS_API_CONFIG_PATH",
+        "FAMILY_OS_REMINDER_CONFIG_PATH",
+        "FAMILY_OS_BRIDGE_STATE_PATH",
+        "FAMILY_OS_BRIDGE_ERROR_LOG_PATH",
+        "FAMILY_OS_BOT_LOCK_PATH",
+        "FAMILY_OS_BOT_ACTIVITY_LOG_PATH",
+        "FAMILY_OS_BOT_FATAL_LOG_PATH",
+        "FAMILY_OS_BOT_STARTUP_DEBUG_LOG_PATH",
+        "FAMILY_OS_BOT_RUNTIME_STATE_PATH",
+        "FAMILY_OS_BOT_HEARTBEAT_PATH",
+        "FAMILY_OS_REMINDER_STATE_PATH",
+        "FAMILY_OS_REMINDER_LOCK_PATH",
+        "FAMILY_OS_REMINDER_ACTIVITY_LOG_PATH",
+        "FAMILY_OS_REMINDER_FATAL_LOG_PATH",
+        "FAMILY_OS_REMINDER_SUPERVISOR_STATE_PATH",
+        "FAMILY_OS_REMINDER_SUPERVISOR_LOG_PATH",
+        "FAMILY_OS_REMINDER_WORKER_RUN_LOG_PATH",
+        "FAMILY_OS_BOT_SUPERVISOR_STATE_PATH",
+        "FAMILY_OS_BOT_SUPERVISOR_LOG_PATH",
+        "FAMILY_OS_BOT_SUPERVISOR_OUT_PATH",
+        "FAMILY_OS_BOT_SUPERVISOR_ERR_PATH",
+        "FAMILY_OS_BOT_RUNTIME_OUT_PATH",
+        "FAMILY_OS_BOT_RUNTIME_ERR_PATH",
+        "FAMILY_OS_BOT_WATCHDOG_LOG_PATH"
     )) {
         Add-ChildEnvironmentVariable -CommandParts $childCommandParts -Name $name
     }
@@ -262,14 +303,17 @@ if ($env:FAMILY_OS_BOT_DETACH -eq "1" -and $env:FAMILY_OS_BOT_SUPERVISOR -ne "1"
     exit 0
 }
 
-$supervisorStatePath = Join-Path $PSScriptRoot "bot-supervisor-state.json"
-$supervisorLogPath = Join-Path $PSScriptRoot "bot-supervisor.log"
-$runtimeOutPath = Join-Path $PSScriptRoot "bot-runtime.out.log"
-$runtimeErrPath = Join-Path $PSScriptRoot "bot-runtime.err.log"
+$supervisorStatePath = $paths.BotSupervisorStatePath
+$supervisorLogPath = $paths.BotSupervisorLogPath
+$runtimeOutPath = $paths.BotRuntimeOutPath
+$runtimeErrPath = $paths.BotRuntimeErrPath
 $supervisorMode = Get-SupervisorMode
 $nodePath = (Get-Command node).Source
 $restartCount = 0
 $windowStartedAt = Get-Date
+foreach ($runtimePath in @($supervisorStatePath, $supervisorLogPath, $runtimeOutPath, $runtimeErrPath)) {
+    Ensure-FamilyOsParentDirectory -Path $runtimePath
+}
 Write-SupervisorLog -Path $supervisorLogPath -Message "Supervisor starting. mode=$supervisorMode skip_skill_sync=$($env:FAMILY_OS_SKIP_SKILL_SYNC -eq '1')"
 Write-SupervisorState -Path $supervisorStatePath -Mode $supervisorMode -Status "starting" -RestartCount 0 -LastBotExitCode $null -ActiveBotPid $null
 

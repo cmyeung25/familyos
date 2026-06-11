@@ -1,15 +1,20 @@
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "instance-paths.ps1")
+$paths = Get-FamilyOsBotPaths -ScriptRoot $PSScriptRoot
+Initialize-FamilyOsBotRuntime -Paths $paths
+
 $botTaskName = "FamilyOSBot"
 $botDir = $PSScriptRoot
-$heartbeatPath = Join-Path $botDir "bot-heartbeat.json"
-$supervisorStatePath = Join-Path $botDir "bot-supervisor-state.json"
-$lockPath = Join-Path $botDir "bot.lock"
-$logPath = Join-Path $botDir "bot-watchdog.log"
+$heartbeatPath = $paths.BotHeartbeatPath
+$supervisorStatePath = $paths.BotSupervisorStatePath
+$lockPath = $paths.BotLockPath
+$logPath = $paths.BotWatchdogLogPath
 $staleMinutes = 5
 
 function Write-WatchdogLog([string]$Message) {
     $timestamp = Get-Date -Format o
+    Ensure-FamilyOsParentDirectory -Path $logPath
     Add-Content -LiteralPath $logPath -Value "[$timestamp] $Message"
 }
 

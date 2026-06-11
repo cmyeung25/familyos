@@ -1,5 +1,9 @@
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "instance-paths.ps1")
+$paths = Get-FamilyOsBotPaths -ScriptRoot $PSScriptRoot
+Initialize-FamilyOsBotRuntime -Paths $paths
+
 function Import-UserEnvironmentVariable([string]$Name) {
     if (-not [Environment]::GetEnvironmentVariable($Name, "Process")) {
         $value = [Environment]::GetEnvironmentVariable($Name, "User")
@@ -21,6 +25,7 @@ function Start-HiddenProcess([string]$WorkingDirectory, [string]$Command) {
 
 function Write-ReminderSupervisorLog([string]$Path, [string]$Message) {
     $timestamp = Get-Date -Format o
+    Ensure-FamilyOsParentDirectory -Path $Path
     Add-Content -LiteralPath $Path -Encoding utf8 -Value "[$timestamp] $Message"
 }
 
@@ -36,6 +41,7 @@ function Write-ReminderSupervisorState(
         timestamp = (Get-Date).ToString("o")
         last_worker_exit_code = $WorkerExitCode
     }
+    Ensure-FamilyOsParentDirectory -Path $Path
     $payload | ConvertTo-Json | Set-Content -LiteralPath $Path -Encoding utf8
 }
 
@@ -52,9 +58,9 @@ function Test-PidAlive([Nullable[int]]$ProcessId) {
     }
 }
 
-$supervisorStatePath = Join-Path $PSScriptRoot "reminder-supervisor-state.json"
-$supervisorLogPath = Join-Path $PSScriptRoot "reminder-supervisor.log"
-$workerRunLogPath = Join-Path $PSScriptRoot "reminder-worker-run.log"
+$supervisorStatePath = $paths.ReminderSupervisorStatePath
+$supervisorLogPath = $paths.ReminderSupervisorLogPath
+$workerRunLogPath = $paths.ReminderWorkerRunLogPath
 $scriptPath = $PSCommandPath
 $scriptRootQuoted = $PSScriptRoot.Replace("'", "''")
 $scriptPathQuoted = $scriptPath.Replace("'", "''")
@@ -96,6 +102,7 @@ while ($true) {
         $workerOutput = & (Join-Path $PSScriptRoot "start-reminder-worker.ps1") -NoExitProcess 2>&1
         $exitCode = $LASTEXITCODE
         if ($workerOutput) {
+            Ensure-FamilyOsParentDirectory -Path $workerRunLogPath
             Add-Content -LiteralPath $workerRunLogPath -Encoding utf8 -Value ("[{0}] {1}" -f (Get-Date -Format o), (($workerOutput | Out-String).TrimEnd()))
         }
         Write-ReminderSupervisorLog -Path $supervisorLogPath -Message "Reminder worker run finished. exit_code=$exitCode"

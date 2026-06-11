@@ -1,19 +1,20 @@
 ﻿import { CodexBridge } from "./codex_bridge.mjs";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const isSelfTest = process.argv.includes("--self-test");
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const lockPath = path.join(scriptDir, "bot.lock");
-const activityLogPath = path.join(scriptDir, "bot-activity.log");
-const fatalLogPath = path.join(scriptDir, "bot-fatal.log");
-const startupDebugLogPath = path.join(scriptDir, "bot-startup-debug.log");
-const runtimeStatePath = path.join(scriptDir, "bot-runtime-state.json");
-const heartbeatPath = path.join(scriptDir, "bot-heartbeat.json");
+const runtimePaths = resolveFamilyOsPaths();
+ensureRuntimeDirectories(runtimePaths);
+const lockPath = runtimePaths.botLockPath;
+const activityLogPath = runtimePaths.botActivityLogPath;
+const fatalLogPath = runtimePaths.botFatalLogPath;
+const startupDebugLogPath = runtimePaths.botStartupDebugLogPath;
+const runtimeStatePath = runtimePaths.botRuntimeStatePath;
+const heartbeatPath = runtimePaths.botHeartbeatPath;
 const activeChatTurns = new Map();
 
+ensureParentDirectory(startupDebugLogPath);
 fs.appendFileSync(startupDebugLogPath, `${JSON.stringify({
   timestamp: new Date().toISOString(),
   argv: process.argv.slice(1),
@@ -657,10 +658,12 @@ function readRuntimeState() {
 }
 
 function writeRuntimeState(state) {
+  ensureParentDirectory(runtimeStatePath);
   fs.writeFileSync(runtimeStatePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
 function writeHeartbeat(status, extra = {}) {
+  ensureParentDirectory(heartbeatPath);
   fs.writeFileSync(heartbeatPath, `${JSON.stringify({
     pid: process.pid,
     status,
@@ -695,6 +698,7 @@ async function withRetry(fn, attempts, delayMs) {
 }
 
 function logActivity(event, details = {}) {
+  ensureParentDirectory(activityLogPath);
   fs.appendFileSync(activityLogPath, `${JSON.stringify({
     timestamp: new Date().toISOString(),
     event,
@@ -703,6 +707,7 @@ function logActivity(event, details = {}) {
 }
 
 function logFatal(event, error) {
+  ensureParentDirectory(fatalLogPath);
   fs.appendFileSync(fatalLogPath, `${JSON.stringify({
     timestamp: new Date().toISOString(),
     event,

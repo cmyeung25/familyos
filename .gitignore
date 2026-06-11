@@ -26,5 +26,17 @@ family-os-build/output/
 family-os-build/node_modules/
 plugins-staging/family-os-bb-inventory/runtime/learned-knowledge.json
 plugins-staging/family-os-bb-inventory/runtime/learning-conflicts.json
+instances/*/.env
+instances/*/.codex-home/
+instances/*/config/persona.yaml
+instances/*/config/reminder-config.json
+instances/*/config/telegram-runtime.json
+instances/*/secrets/
+instances/*/logs/
+instances/*/state/
+instances/*/memory/
+instances/*/skills_private/
+instances/*/skills_pending/
+instances/*/runtime/knowledge/
 plink.log
 tmp_*

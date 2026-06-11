@@ -4,6 +4,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "instance-paths.ps1")
+$paths = Get-FamilyOsBotPaths -ScriptRoot $PSScriptRoot
+Initialize-FamilyOsBotRuntime -Paths $paths
+
 function Import-UserEnvironmentVariable([string]$Name) {
     if (-not [Environment]::GetEnvironmentVariable($Name, "Process")) {
         $value = [Environment]::GetEnvironmentVariable($Name, "User")
@@ -21,7 +25,7 @@ foreach ($name in @(
     Import-UserEnvironmentVariable $name
 }
 
-$botConfigPath = Join-Path $PSScriptRoot "local-bot-config.json"
+$botConfigPath = $paths.BotConfigPath
 if (Test-Path -LiteralPath $botConfigPath) {
     $botConfig = Get-Content -LiteralPath $botConfigPath -Encoding utf8 -Raw | ConvertFrom-Json
     if (-not $env:TELEGRAM_BOT_TOKEN -and $botConfig.telegram_bot_token_dpapi) {
@@ -36,7 +40,7 @@ if (Test-Path -LiteralPath $botConfigPath) {
     }
 }
 
-$apiConfigPath = Join-Path $PSScriptRoot "..\family-os-apps-script\local-api-config.json"
+$apiConfigPath = $paths.ApiConfigPath
 if ((-not $env:FAMILY_OS_API_URL -or -not $env:FAMILY_OS_API_KEY) -and (Test-Path -LiteralPath $apiConfigPath)) {
     $config = Get-Content -LiteralPath $apiConfigPath -Encoding utf8 -Raw | ConvertFrom-Json
     if (-not $env:FAMILY_OS_API_URL) {

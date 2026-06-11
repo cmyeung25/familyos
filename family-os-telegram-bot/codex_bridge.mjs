@@ -5,20 +5,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { Codex } from "@openai/codex-sdk";
+import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const defaultWorkspace = path.resolve(scriptDir, "..");
-const defaultStatePath = path.join(scriptDir, ".codex-bridge-state.json");
-const bridgeErrorLogPath = path.join(scriptDir, "bridge-error.log");
-const defaultRuntimeConfigPath = path.join(
-  scriptDir,
-  "..",
-  "plugins-staging",
-  "family-os-bb-inventory",
-  "runtime",
-  "telegram-runtime.json",
-);
-const defaultReminderConfigPath = path.join(scriptDir, "reminder-config.json");
+const runtimePaths = resolveFamilyOsPaths();
+ensureRuntimeDirectories(runtimePaths);
+const defaultWorkspace = runtimePaths.workspaceRoot;
+const defaultStatePath = runtimePaths.bridgeStatePath;
+const bridgeErrorLogPath = runtimePaths.bridgeErrorLogPath;
+const defaultRuntimeConfigPath = runtimePaths.runtimeConfigPath;
+const defaultReminderConfigPath = runtimePaths.reminderConfigPath;
 const bundledCodexPath = path.join(
   scriptDir,
   "node_modules",
@@ -102,6 +98,7 @@ export class CodexBridge {
     this.statePath = path.resolve(statePath);
     this.runtimeConfigPath = path.resolve(runtimeConfigPath);
     this.reminderConfigPath = path.resolve(reminderConfigPath);
+    this.skillsRoot = path.resolve(process.env.FAMILY_OS_SKILLS_ROOT || path.join(this.workspace, ".agents", "skills"));
     this.timeoutMs = timeoutMs;
     this.codex = new Codex();
     this.runtimeConfig = readRuntimeConfig(this.runtimeConfigPath);
@@ -134,7 +131,7 @@ export class CodexBridge {
       runtime_knowledge_root: fs.existsSync(this.runtimeKnowledgeRoot),
       skills: Object.fromEntries(this.runtimeConfig.skill_names.map((name) => [
         name,
-        fs.existsSync(path.join(this.workspace, ".agents", "skills", name, "SKILL.md")),
+        fs.existsSync(path.join(this.skillsRoot, name, "SKILL.md")),
       ])),
       references: Object.fromEntries(Object.entries(this.runtimeConfig.references).map(([name, relativePath]) => [
         name,
@@ -578,6 +575,7 @@ export class CodexBridge {
   }
 
   saveState() {
+    ensureParentDirectory(this.statePath);
     fs.writeFileSync(this.statePath, `${JSON.stringify(this.state, null, 2)}\n`, "utf8");
   }
 }
@@ -1540,6 +1538,7 @@ function redact(text) {
 
 function appendBridgeErrorLog(error, context = {}) {
   try {
+    ensureParentDirectory(bridgeErrorLogPath);
     const entry = {
       timestamp: new Date().toISOString(),
       message: redact(String(error?.message || error || "")),

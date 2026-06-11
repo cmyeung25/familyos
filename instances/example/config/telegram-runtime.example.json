@@ -1,0 +1,40 @@
+{
+  "plugin_name": "family-os-bb-inventory",
+  "primary_skill_root": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory",
+  "api_skill_root": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory-api",
+  "skill_names": [
+    "family-os-bb-inventory",
+    "family-os-bb-inventory-api"
+  ],
+  "runtime_knowledge_root": "instances/example/runtime/knowledge",
+  "relative_config_path": "instances/example/config/telegram-runtime.json",
+  "bridge_commands": {
+    "bb_inventory_api": {
+      "runner": "node",
+      "path": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory-api/scripts/family_os_bb_inventory_api_client.mjs",
+      "node_args": [
+        "--use-system-ca"
+      ]
+    },
+    "runtime_learning": {
+      "runner": "node",
+      "path": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/scripts/manage_runtime_learning.mjs",
+      "node_args": []
+    },
+    "inventory_unit_preflight": {
+      "runner": "node",
+      "path": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/scripts/inventory_unit_preflight.mjs",
+      "node_args": [
+        "--use-system-ca"
+      ]
+    }
+  },
+  "references": {
+    "bb_log_templates": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/bb-log-templates.md",
+    "inventory_flows": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/inventory-flows.md",
+    "task_management": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/task-management.md",
+    "unit_normalization": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/unit-normalization.md",
+    "ambiguity_policy": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/ambiguity-policy.md",
+    "self_enhance_policy": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/self-enhance-policy.md"
+  }
+}

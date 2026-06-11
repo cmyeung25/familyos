@@ -1,6 +1,7 @@
 ﻿import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { resolveFamilyOsPaths } from "./instance_paths.mjs";
 
 export class FamilyOsApiClientError extends Error {
   constructor(message, { code = "client_error", details = {} } = {}) {
@@ -25,13 +26,15 @@ export function createFamilyOsApiClient({
 } = {}) {
   return new FamilyOsApiClient({
     workspace: path.resolve(workspace || process.cwd()),
+    apiConfigPath: resolveFamilyOsPaths().apiConfigPath,
     actorId,
   });
 }
 
 class FamilyOsApiClient {
-  constructor({ workspace, actorId }) {
+  constructor({ workspace, apiConfigPath, actorId }) {
     this.workspace = workspace;
+    this.apiConfigPath = apiConfigPath ? path.resolve(apiConfigPath) : resolveFamilyOsPaths().apiConfigPath;
     this.actorId = actorId;
     this.inventorySnapshotCache = null;
     this.environmentLoaded = false;
@@ -60,15 +63,16 @@ class FamilyOsApiClient {
       return;
     }
 
-    const configPath = path.join(this.workspace, "family-os-apps-script", "local-api-config.json");
+    const configPath = this.apiConfigPath;
     if (!fs.existsSync(configPath)) {
       throw new FamilyOsApiClientError("FAMILY_OS_API_URL is not configured.", {
         code: "missing_env",
       });
     }
 
+    const scriptLiteralPath = configPath.replace(/'/g, "''");
     const script = [
-      "$config = Get-Content -LiteralPath '.\\\\family-os-apps-script\\\\local-api-config.json' -Encoding utf8 -Raw | ConvertFrom-Json",
+      `$config = Get-Content -LiteralPath '${scriptLiteralPath}' -Encoding utf8 -Raw | ConvertFrom-Json`,
       "$secureApiKey = ConvertTo-SecureString $config.api_key_dpapi",
       "$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureApiKey)",
       "try {",

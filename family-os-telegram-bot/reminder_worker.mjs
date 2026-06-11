@@ -1,14 +1,14 @@
 ﻿import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
 
 const TELEGRAM_API = "https://api.telegram.org";
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.join(scriptDir, "reminder-config.json");
-const statePath = path.join(scriptDir, "reminder-state.json");
-const lockPath = path.join(scriptDir, "reminder-worker.lock");
-const activityLogPath = path.join(scriptDir, "reminder-worker-activity.log");
-const fatalLogPath = path.join(scriptDir, "reminder-worker-fatal.log");
+const runtimePaths = resolveFamilyOsPaths();
+ensureRuntimeDirectories(runtimePaths);
+const configPath = runtimePaths.reminderConfigPath;
+const statePath = runtimePaths.reminderStatePath;
+const lockPath = runtimePaths.reminderLockPath;
+const activityLogPath = runtimePaths.reminderActivityLogPath;
+const fatalLogPath = runtimePaths.reminderFatalLogPath;
 const isSelfTest = process.argv.includes("--self-test");
 const isDryRun = process.argv.includes("--dry-run");
 const dueNowCatchupGraceMs = 5 * 60000;
@@ -752,6 +752,7 @@ function readJsonFile(filePath, fallback) {
 }
 
 function writeJsonFile(filePath, value) {
+  ensureParentDirectory(filePath);
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
@@ -821,6 +822,7 @@ async function withRetry(fn, attempts, delayMs) {
 }
 
 function logActivity(event, fields = {}) {
+  ensureParentDirectory(activityLogPath);
   fs.appendFileSync(activityLogPath, `${JSON.stringify({
     timestamp: new Date().toISOString(),
     event,
@@ -829,6 +831,7 @@ function logActivity(event, fields = {}) {
 }
 
 function logFatal(event, error) {
+  ensureParentDirectory(fatalLogPath);
   fs.appendFileSync(fatalLogPath, `${JSON.stringify({
     timestamp: new Date().toISOString(),
     event,
