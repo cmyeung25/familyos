@@ -36,6 +36,16 @@ The container runtime is Linux-compatible and does not depend on PowerShell or W
 - a mounted instance folder under `/data/instance`
 - a mounted Codex auth cache under `/data/instance/.codex-home` if you keep using Codex login
 
+## Phase 3 preview
+
+Single-instance Synology rollout is now scaffolded with:
+
+- [docker-compose.gary.yml](/C:/Users/user/OneDrive/文件/屋企清單/docker-compose.gary.yml)
+- [docs/synology-phase3-single-bot.md](/C:/Users/user/OneDrive/文件/屋企清單/docs/synology-phase3-single-bot.md)
+- [instances/gary/README.md](/C:/Users/user/OneDrive/文件/屋企清單/instances/gary/README.md)
+
+This phase is ready for a real `gary` tenant once you fill the private files under `instances/gary/`.
+
 ## Instance path envs
 
 The bot now supports these path overrides:

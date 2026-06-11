@@ -1,0 +1,42 @@
+{
+  "timezone": "Asia/Hong_Kong",
+  "recipients": [
+    {
+      "enabled": true,
+      "name": "gary-owner",
+      "telegram_user_id": "123456789",
+      "chat_id": "123456789",
+      "role": "family",
+      "person_scope": {
+        "primary_person_id": "per_husband",
+        "owner_person_ids": [
+          "per_husband"
+        ],
+        "related_person_ids": [
+          "per_husband",
+          "per_wife",
+          "per_baby"
+        ]
+      },
+      "quiet_hours": {
+        "enabled": true,
+        "start": "23:00",
+        "end": "07:00"
+      },
+      "preferences": {
+        "low_stock_mode": "instant",
+        "task_due_now": true,
+        "task_due_now_bypass_quiet_hours": true,
+        "task_due_24h": true,
+        "task_due_2h": false,
+        "task_window_days": 7,
+        "task_categories": [],
+        "daily_digest": {
+          "enabled": true,
+          "time": "09:00",
+          "task_window_hours": 36
+        }
+      }
+    }
+  ]
+}
