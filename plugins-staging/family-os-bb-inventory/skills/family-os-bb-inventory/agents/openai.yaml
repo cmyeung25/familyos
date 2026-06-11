@@ -1,0 +1,4 @@
+interface:
+  display_name: "Family OS BB + Inventory"
+  short_description: "Narrow Telegram runtime for BB logs and inventory."
+  default_prompt: "Use $family-os-bb-inventory together with $family-os-bb-inventory-api for my BB or inventory Telegram request."

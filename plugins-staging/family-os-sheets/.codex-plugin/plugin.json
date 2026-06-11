@@ -1,0 +1,21 @@
+{
+  "name": "family-os-sheets",
+  "version": "0.1.0+codex.20260601165442",
+  "description": "Quickly log daily household events and safely query or update the Family OS workbook.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Family OS Sheets",
+    "shortDescription": "Quickly log daily events and manage the Family OS workbook.",
+    "longDescription": "Use fast paths for routine baby logs, inventory movements and dashboard questions, while preserving audited household finance, task, caregiver, document and property records.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": "Quickly record my Family OS household update and preserve the audit trail."
+  }
+}

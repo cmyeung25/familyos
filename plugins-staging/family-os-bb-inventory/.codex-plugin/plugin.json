@@ -1,0 +1,21 @@
+{
+  "name": "family-os-bb-inventory",
+  "version": "0.1.0+codex.20260607",
+  "description": "Family OS BB log and inventory Telegram V2 runtime.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Family OS BB + Inventory",
+    "shortDescription": "Handle BB logs and inventory through the narrow Telegram V2 runtime.",
+    "longDescription": "Use a narrow Family OS runtime for BB logs, inventory management, Telegram follow-up questions, and structured self-enhance knowledge.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": "Use the Family OS BB + Inventory V2 runtime to handle my Telegram BB or inventory update."
+  }
+}

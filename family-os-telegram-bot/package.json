@@ -1,0 +1,13 @@
+{
+  "name": "family-os-telegram-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-skills": "node sync_skills.mjs",
+    "self-test": "node sync_skills.mjs && node ..\\plugins-staging\\family-os-bb-inventory\\skills\\family-os-bb-inventory\\scripts\\manage_runtime_learning.mjs --self-test && node ..\\plugins-staging\\family-os-bb-inventory\\skills\\family-os-bb-inventory-api\\scripts\\family_os_bb_inventory_api_client.mjs --self-test && node codex_bridge.mjs --self-test && node bot.mjs --self-test && node reminder_worker.mjs --self-test"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "0.135.0"
+  }
+}

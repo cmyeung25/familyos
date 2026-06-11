@@ -1,0 +1,70 @@
+{
+  "health": {
+    "action": "health",
+    "payload": {}
+  },
+  "low_stock": {
+    "action": "get_low_stock_items",
+    "payload": {}
+  },
+  "baby_feeding": {
+    "action": "append_baby_log",
+    "payload": {
+      "log_type": "feeding",
+      "log_subtype": "milk",
+      "value_number": 120,
+      "unit": "ml"
+    },
+    "request_text": "BB 岩岩飲左 120 ml 奶"
+  },
+  "shopping_batch": {
+    "action": "record_inventory_purchase_batch",
+    "payload": {
+      "items": [
+        {
+          "item_key": "cooking_oil",
+          "item_name": "油",
+          "category": "groceries",
+          "unit": "bottle",
+          "quantity": 1
+        },
+        {
+          "item_key": "instant_noodles",
+          "item_name": "公仔麵",
+          "category": "groceries",
+          "unit": "pack",
+          "quantity": 10,
+          "expiry_date": "2026-12-31"
+        }
+      ]
+    },
+    "request_text": "今日買咗1支油，仲有10包公仔麵，26年12月到期"
+  },
+  "consume_batch": {
+    "action": "record_inventory_consume_batch",
+    "payload": {
+      "event_at": "2026-06-01 22:28:00+08:00",
+      "items": [
+        {
+          "item_id": "itm_cooking_oil",
+          "item_name": "油",
+          "unit": "bottle",
+          "quantity": 1
+        },
+        {
+          "item_id": "itm_salt",
+          "item_name": "salt",
+          "unit": "pack",
+          "quantity": 1
+        },
+        {
+          "item_id": "itm_sugar",
+          "item_name": "糖",
+          "unit": "pack",
+          "quantity": 2
+        }
+      ]
+    },
+    "request_text": "今日用咗1支油，1包salt，2包糖，下午10:28"
+  }
+}

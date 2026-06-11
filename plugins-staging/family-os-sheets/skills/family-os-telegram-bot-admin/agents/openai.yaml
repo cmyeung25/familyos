@@ -1,0 +1,7 @@
+interface:
+  display_name: "Family OS Telegram Bot Admin"
+  short_description: "Set up and maintain the private Family OS Telegram Bot."
+  default_prompt: "Use $family-os-telegram-bot-admin to configure and validate my private Family OS Telegram Bot."
+
+policy:
+  allow_implicit_invocation: true

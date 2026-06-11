@@ -1,0 +1,4 @@
+interface:
+  display_name: "Family OS Sheets"
+  short_description: "Quickly log daily household events and review Family OS."
+  default_prompt: "Use $family-os-sheets to quickly record my household update and preserve the audit trail."

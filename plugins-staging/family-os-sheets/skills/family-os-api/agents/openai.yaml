@@ -1,0 +1,4 @@
+interface:
+  display_name: "Family OS API"
+  short_description: "Use the compact Apps Script API for Family OS."
+  default_prompt: "Use $family-os-api to query or update my Family OS through the compact Apps Script API."

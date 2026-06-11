@@ -1,0 +1,7 @@
+interface:
+  display_name: "Family OS Telegram Semantic Bridge"
+  short_description: "Understand Telegram household requests as natural-language Family OS operations."
+  default_prompt: "Use $family-os-telegram-router to interpret this private Family OS Telegram message as a high-level household operation and map it safely."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,38 @@
+﻿[
+  {
+    "pasteData": {
+      "coordinate": {
+        "sheetId": 1313980804,
+        "rowIndex": 1,
+        "columnIndex": 3
+      },
+      "data": "baby_consumable\nbaby_consumable\nbaby_consumable\npersonal_care\nhousehold_cleaning\nmedicine\npet_food\npet_litter\ngroceries\npersonal_care\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\nbaby_consumable\nbaby_consumable\npersonal_care\nbaby_consumable\npersonal_care\npersonal_care\npersonal_care\npersonal_care\nhousehold_cleaning\npersonal_care\npersonal_care\npersonal_care\nhousehold_cleaning\npersonal_care\npersonal_care\npersonal_care\npersonal_care\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\npersonal_care\npersonal_care\npersonal_care\nbaby_consumable\nbaby_consumable\nbaby_consumable\npersonal_care\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\ngroceries\npersonal_care\ngroceries\ngroceries\ngroceries",
+      "type": "PASTE_NORMAL",
+      "delimiter": "\t"
+    }
+  },
+  {
+    "pasteData": {
+      "coordinate": {
+        "sheetId": 1313980804,
+        "rowIndex": 1,
+        "columnIndex": 8
+      },
+      "data": "\n\n\n\n\n\n\n\n\nsofttouch baby\n\n\n\n\n\n順順兒\n順順兒\nsofttouch baby\n\nbiolane expert\n\nmustela\nmustela\n\nmustela\nweleda\nQv baby\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nHuggies\n其他牌子\nPampas黑金\nNUK\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "type": "PASTE_NORMAL",
+      "delimiter": "\t"
+    }
+  },
+  {
+    "pasteData": {
+      "coordinate": {
+        "sheetId": 1313980804,
+        "rowIndex": 0,
+        "columnIndex": 21
+      },
+      "data": "canonical_item_name\ttarget_group\tbrand_name\n尿片\tbaby\t\n奶粉\tbaby\t\nBB濕紙巾\tbaby\t\n廁紙\tshared\t\n清潔用品\tshared\t\n常用藥物\tfamily\t\n貓糧\tpet\t\n貓砂\tpet\t\nPizza\tshared\t\nBB棉花球\tbaby\tsofttouch baby\n油\tshared\t\n鹽\tshared\t\n糖\tshared\t\n公仔麵\tshared\t\n薯片\tshared\t\nBB濕紙巾\tbaby\t順順兒\n手提BB濕紙巾\tbaby\t順順兒\nBB清潔棉\tbaby\tsofttouch baby\n口水肩\tbaby\t\npat pat膏\tbaby\tbiolane expert\nBB沖涼液\tbaby\t\nBB油\tbaby\tmustela\nBB洗頭水\tbaby\tmustela\n奶樽清潔液\tbaby\t\npat pat膏\tbaby\tmustela\npat pat膏\tbaby\tweleda\nBB保濕膏\tbaby\tQv baby\nBB洗衣液\tbaby\t\n面紙\tshared\t\n濕紙巾\tshared\t\n沐浴露\tfamily\t\n牙膏\tfamily\t\n即食薯仔湯\tshared\t\n罐頭菠蘿\tshared\t\n罐頭雜果\tshared\t\n芝麻拌麵\tshared\t\n牛奶\tshared\t\n雞蛋\tshared\t\n芝士蛋糕\tshared\t\n棉花棒\tshared\t\n牙線\tfamily\t\nBody lotion\tfamily\t\n初生紙尿片\tbaby\tHuggies\n初生紙尿片\tbaby\t其他牌子\n初生紙尿片\tbaby\tPampas黑金\nBB口腔清潔棉\tbaby\tNUK\n米酒\tshared\t\n蠔油\tshared\t\n茄汁\tshared\t\n醋\tshared\t\n老抽\tshared\t\n生粉\tshared\t\nXO醬\tshared\t\n麻油\tshared\t\n雞粉\tshared\t\n濃湯寶\tshared\t\n沐浴露\tfamily\t\n乳酪\tshared\t\n粟米片\tshared\t\n雞蛋\tshared\t",
+      "type": "PASTE_NORMAL",
+      "delimiter": "\t"
+    }
+  }
+]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Family OS API Admin"
+  short_description: "Deploy and maintain the Family OS Apps Script API."
+  default_prompt: "Use $family-os-api-admin to deploy or maintain my Family OS Apps Script API safely."

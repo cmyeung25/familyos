@@ -1,0 +1,4 @@
+interface:
+  display_name: "Family OS BB + Inventory API"
+  short_description: "Narrow local API wrapper for BB logs and inventory."
+  default_prompt: "Use $family-os-bb-inventory-api to execute only the narrow Family OS BB + inventory API actions."
