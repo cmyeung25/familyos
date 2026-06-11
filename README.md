@@ -35,6 +35,7 @@ The container runtime is Linux-compatible and does not depend on PowerShell or W
 - `FAMILY_OS_API_KEY`
 - a mounted instance folder under `/data/instance`
 - a mounted Codex auth cache under `/data/instance/.codex-home` if you keep using Codex login
+- optional extra CA certs under `/data/instance/secrets/certs/*.crt` when the host network path uses TLS interception or a private trust root
 
 ## Phase 3 preview
 
@@ -45,6 +46,7 @@ Single-instance Synology rollout is now scaffolded with:
 - [instances/gary/README.md](/C:/Users/user/OneDrive/文件/屋企清單/instances/gary/README.md)
 
 This phase is ready for a real `gary` tenant once you fill the private files under `instances/gary/`.
+The local laptop Docker bring-up for `gary` has already been validated end-to-end, including Codex login and Telegram polling.
 
 ## Instance path envs
 

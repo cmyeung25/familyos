@@ -64,6 +64,24 @@ Optional but recommended:
 - also copy `config.toml` into `instances/gary/.codex-home/`
 - ensure only NAS admins can read this folder
 
+## 4a. Optional extra CA certificates
+
+If the outbound network path on the host uses HTTPS/TLS interception, private SSL inspection, or a custom enterprise root CA, place PEM `.crt` files at:
+
+```bash
+instances/gary/secrets/certs/
+```
+
+The Docker runtime now imports `*.crt` from that folder into the container trust store on startup.
+
+Typical examples:
+
+- antivirus web shield certificates
+- corporate proxy root CAs
+- private TLS inspection gateways
+
+Do not add this folder unless you actually need it.
+
 ## 5. Build and start
 
 ```bash
@@ -101,6 +119,13 @@ From Telegram, validate:
 - one controlled BB / inventory write
 
 Then confirm the write in Family OS `audit_log`.
+
+For the laptop reference rollout, this path has already been validated with:
+
+- Docker long polling
+- Codex login from mounted `.codex-home`
+- Telegram round-trip
+- audited inventory write
 
 ## 7. Restart and rollback
 
