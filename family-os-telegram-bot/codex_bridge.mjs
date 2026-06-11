@@ -122,9 +122,12 @@ export class CodexBridge {
 
   health({ requireLogin = true } = {}) {
     const login = readCodexLoginStatus();
+    const codexHome = process.env.CODEX_HOME
+      ? path.resolve(process.env.CODEX_HOME)
+      : path.join(os.homedir(), ".codex");
     const checks = {
       codex_login: login.message,
-      desktop_auth_cache: fs.existsSync(path.join(os.homedir(), ".codex", "auth.json")),
+      desktop_auth_cache: fs.existsSync(path.join(codexHome, "auth.json")),
       workspace: fs.existsSync(this.workspace),
       agents_md: fs.existsSync(path.join(this.workspace, "AGENTS.md")),
       runtime_config: fs.existsSync(this.runtimeConfigPath),
@@ -1557,11 +1560,18 @@ function appendBridgeErrorLog(error, context = {}) {
 }
 
 function readCodexLoginStatus() {
+  const localCodexHome = process.env.CODEX_HOME
+    ? path.resolve(process.env.CODEX_HOME)
+    : path.join(os.homedir(), ".codex");
   for (const codexCommand of [bundledCodexPath, "codex"]) {
     try {
       const output = execFileSync(codexCommand, ["login", "status"], {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          CODEX_HOME: localCodexHome,
+        },
       }).trim();
 
       if (/not logged in/i.test(output)) {
@@ -1569,6 +1579,9 @@ function readCodexLoginStatus() {
       }
       return { ok: true, message: output || "Logged in" };
     } catch (error) {
+      if (error?.code === "ENOENT") {
+        continue;
+      }
       const output = `${error.stdout || ""}${error.stderr || ""}`.trim();
       if (/not logged in/i.test(output) || /not logged in/i.test(String(error.message || ""))) {
         return { ok: false, message: output || "Not logged in" };

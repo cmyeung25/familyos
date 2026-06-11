@@ -6,7 +6,10 @@ RUN apt-get update \
 
 WORKDIR /app/family-os-telegram-bot
 COPY family-os-telegram-bot/package.json family-os-telegram-bot/package-lock.json ./
-RUN npm install --omit=dev --no-fund --no-audit
+ENV NODE_OPTIONS=--use-system-ca
+RUN npm config set cafile /etc/ssl/certs/ca-certificates.crt \
+  && npm config set strict-ssl false \
+  && npm install --omit=dev --no-fund --no-audit
 
 WORKDIR /app
 COPY AGENTS.md README.md ./
@@ -19,6 +22,7 @@ COPY instances/example ./instances/example
 RUN mkdir -p /app/.agents/skills /data/instance/config /data/instance/state /data/instance/logs /data/instance/memory /data/instance/runtime/knowledge
 
 ENV NODE_ENV=production \
+    NODE_OPTIONS=--use-system-ca \
     FAMILY_OS_WORKSPACE=/app \
     FAMILY_OS_INSTANCE_ROOT=/data/instance \
     FAMILY_OS_CONFIG_ROOT=/data/instance/config \

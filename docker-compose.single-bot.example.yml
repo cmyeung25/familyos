@@ -11,6 +11,8 @@ services:
       FAMILY_OS_HEALTHCHECK_MODE: bot
     volumes:
       - ./instances/example:/data/instance
+      - ./instances/example:/app/instances/example
+    command: ["bot"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
@@ -31,6 +33,8 @@ services:
       FAMILY_OS_HEALTHCHECK_MODE: reminder
     volumes:
       - ./instances/example:/data/instance
+      - ./instances/example:/app/instances/example
+    command: ["reminder"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
