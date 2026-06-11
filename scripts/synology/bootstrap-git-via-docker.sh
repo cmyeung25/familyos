@@ -18,12 +18,16 @@ run_docker() {
 echo "Bootstrapping git metadata in $REPO_ROOT from $ORIGIN_URL ($TARGET_BRANCH)"
 
 run_docker run --rm \
+  --entrypoint /bin/sh \
   -e ORIGIN_URL="$ORIGIN_URL" \
   -e TARGET_BRANCH="$TARGET_BRANCH" \
   -v "$REPO_ROOT:/repo" \
   -w /repo \
   "$GIT_IMAGE" \
-  sh -lc '
+  -lc '
+    set -eu
+    git config --global --add safe.directory /repo
+
     if [ ! -d .git ]; then
       git init
     fi

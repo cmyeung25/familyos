@@ -18,11 +18,14 @@ run_docker() {
 echo "Updating repo in $REPO_ROOT from origin/$TARGET_BRANCH"
 
 run_docker run --rm \
+  --entrypoint /bin/sh \
   -e TARGET_BRANCH="$TARGET_BRANCH" \
   -v "$REPO_ROOT:/repo" \
   -w /repo \
   "$GIT_IMAGE" \
-  sh -lc '
+  -lc '
+    set -eu
+    git config --global --add safe.directory /repo
     test -d .git
     git fetch origin "$TARGET_BRANCH" --tags
     git checkout "$TARGET_BRANCH"
