@@ -36,7 +36,7 @@ run_docker run --rm \
 
     git fetch origin "$TARGET_BRANCH" --tags
     git branch -M "$TARGET_BRANCH"
-    git reset --mixed "origin/$TARGET_BRANCH"
+    git reset --hard "origin/$TARGET_BRANCH"
     git status --short
   '
 

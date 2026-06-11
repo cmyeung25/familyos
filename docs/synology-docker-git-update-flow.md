@@ -24,7 +24,7 @@ What it does:
 - initializes `.git` if missing
 - sets `origin` to `https://github.com/cmyeung25/familyos.git`
 - fetches `main`
-- resets git metadata to match `origin/main`
+- hard-resets tracked files to match `origin/main`
 - keeps ignored private files such as `.env`, secrets, logs, and `.codex-home`
 
 ## Normal update flow
