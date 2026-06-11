@@ -1,0 +1,47 @@
+services:
+  familyos-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: familyos:single-bot
+    env_file:
+      - ./instances/example/.env
+    environment:
+      FAMILY_OS_SERVICE_MODE: bot
+      FAMILY_OS_HEALTHCHECK_MODE: bot
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS:-}
+      FAMILY_OS_API_URL: ${FAMILY_OS_API_URL}
+      FAMILY_OS_API_KEY: ${FAMILY_OS_API_KEY}
+    volumes:
+      - ./instances/example:/data/instance
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  familyos-reminder:
+    image: familyos:single-bot
+    depends_on:
+      familyos-bot:
+        condition: service_started
+    env_file:
+      - ./instances/example/.env
+    environment:
+      FAMILY_OS_SERVICE_MODE: reminder
+      FAMILY_OS_HEALTHCHECK_MODE: reminder
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      FAMILY_OS_API_URL: ${FAMILY_OS_API_URL}
+      FAMILY_OS_API_KEY: ${FAMILY_OS_API_KEY}
+    volumes:
+      - ./instances/example:/data/instance
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

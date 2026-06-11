@@ -19,6 +19,23 @@ Phase 1 introduces instance-aware paths without changing core bot behavior:
 
 The current code still uses the same shared business logic and the same Google Sheets API contract.
 
+## Phase 2 preview
+
+Single-bot Dockerization is now scaffolded with:
+
+- [Dockerfile](/C:/Users/user/OneDrive/文件/屋企清單/Dockerfile)
+- [docker/start-family-os.mjs](/C:/Users/user/OneDrive/文件/屋企清單/docker/start-family-os.mjs)
+- [docker/healthcheck.mjs](/C:/Users/user/OneDrive/文件/屋企清單/docker/healthcheck.mjs)
+- [docker-compose.single-bot.example.yml](/C:/Users/user/OneDrive/文件/屋企清單/docker-compose.single-bot.example.yml)
+
+The container runtime is Linux-compatible and does not depend on PowerShell or Windows Scheduled Tasks. It expects:
+
+- `TELEGRAM_BOT_TOKEN`
+- `FAMILY_OS_API_URL`
+- `FAMILY_OS_API_KEY`
+- a mounted instance folder under `/data/instance`
+- a mounted Codex auth cache under `/data/instance/.codex-home` if you keep using Codex login
+
 ## Instance path envs
 
 The bot now supports these path overrides:
