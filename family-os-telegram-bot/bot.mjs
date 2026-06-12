@@ -1,6 +1,7 @@
 ﻿import { CodexBridge } from "./codex_bridge.mjs";
 import fs from "node:fs";
 import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
+import { loadFamilyOsPersona } from "./persona_config.mjs";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const isSelfTest = process.argv.includes("--self-test");
@@ -13,6 +14,7 @@ const startupDebugLogPath = runtimePaths.botStartupDebugLogPath;
 const runtimeStatePath = runtimePaths.botRuntimeStatePath;
 const heartbeatPath = runtimePaths.botHeartbeatPath;
 const activeChatTurns = new Map();
+const persona = loadFamilyOsPersona();
 
 ensureParentDirectory(startupDebugLogPath);
 fs.appendFileSync(startupDebugLogPath, `${JSON.stringify({
@@ -139,7 +141,7 @@ async function handleMessage(message) {
   writeHeartbeat("message_received", { user_id: userId, chat_id: chatId });
 
   if (message.chat.type !== "private") {
-    await reply(chatId, "多比而家只可以喺 Telegram 私人對話入面幫手。");
+    await reply(chatId, `${persona.firstPersonStyle}而家只可以喺 Telegram 私人對話入面幫手。`);
     return;
   }
 
@@ -148,7 +150,7 @@ async function handleMessage(message) {
     return;
   }
   if (!config.allowedUserIds.has(userId)) {
-    await reply(chatId, `多比未見到你喺 allowlist 入面。你的 Telegram user ID 係 ${userId}`);
+    await reply(chatId, `${persona.firstPersonStyle}未見到你喺 allowlist 入面。你的 Telegram user ID 係 ${userId}`);
     return;
   }
   if (text === "/start" || text === "/help") {
@@ -157,7 +159,7 @@ async function handleMessage(message) {
   }
   if (text === "/reset") {
     bridge.reset(chatId);
-    await reply(chatId, "多比已經清走呢個 Telegram 對話嘅 bridge 上下文。");
+    await reply(chatId, `${persona.firstPersonStyle}已經清走呢個 Telegram 對話嘅 bridge 上下文。`);
     return;
   }
   if (text === "/bridgehealth") {
@@ -167,7 +169,7 @@ async function handleMessage(message) {
 
   const activeTurn = activeChatTurns.get(String(chatId));
   if (activeTurn && Date.now() - activeTurn.started_at < 150000) {
-    await reply(chatId, "多比仲處理緊上一句，請等多比做完，或者用 /reset 清走今次對話狀態。");
+    await reply(chatId, `${persona.firstPersonStyle}仲處理緊上一句，請等${persona.firstPersonStyle}做完，或者用 /reset 清走今次對話狀態。`);
     return;
   }
 
@@ -177,14 +179,14 @@ async function handleMessage(message) {
     const result = await withTimeout(
       bridge.run(chatId, text, { telegramUserId: userId }),
       150000,
-      "多比處理得比平時耐少少。你可以等一等，或者用 /reset 清走今次對話狀態。",
+      `${persona.firstPersonStyle}處理得比平時耐少少。你可以等一等，或者用 /reset 清走今次對話狀態。`,
     );
     writeHeartbeat("codex_turn_completed", { user_id: userId, chat_id: chatId });
     await replyResponse(chatId, result);
   } catch (error) {
     logActivity("codex_turn_failed", { user_id: userId, error: String(error.message || error) });
     writeHeartbeat("codex_turn_failed", { user_id: userId, chat_id: chatId, error: String(error.message || error) });
-    await reply(chatId, `多比啱啱卡住咗：${error.message}`);
+    await reply(chatId, `${persona.firstPersonStyle}啱啱卡住咗：${error.message}`);
   } finally {
     activeChatTurns.delete(String(chatId));
   }
@@ -200,7 +202,7 @@ async function handleCallbackQuery(query) {
   if (!chatId) {
     await safeAnswerCallbackQuery(query.id, {
       callback_query_id: query.id,
-      text: "多比搵唔到原本嗰條訊息。",
+      text: `${persona.firstPersonStyle}搵唔到原本嗰條訊息。`,
       show_alert: false,
     });
     return;
@@ -208,7 +210,7 @@ async function handleCallbackQuery(query) {
   if (!config.allowedUserIds.has(userId)) {
     await safeAnswerCallbackQuery(query.id, {
       callback_query_id: query.id,
-      text: "多比未見到你喺 allowlist 入面。",
+      text: `${persona.firstPersonStyle}未見到你喺 allowlist 入面。`,
       show_alert: true,
     });
     return;
@@ -218,7 +220,7 @@ async function handleCallbackQuery(query) {
   if (activeTurn && Date.now() - activeTurn.started_at < 150000) {
     await safeAnswerCallbackQuery(query.id, {
       callback_query_id: query.id,
-      text: "多比仲處理緊上一句。",
+      text: `${persona.firstPersonStyle}仲處理緊上一句。`,
       show_alert: false,
     });
     return;
@@ -228,14 +230,14 @@ async function handleCallbackQuery(query) {
     activeChatTurns.set(String(chatId), { started_at: Date.now(), user_id: userId });
     await safeAnswerCallbackQuery(query.id, {
       callback_query_id: query.id,
-      text: "多比收到喇。",
+      text: `${persona.firstPersonStyle}收到喇。`,
       show_alert: false,
     });
     await reply(chatId, buildCallbackAckText(query));
     const result = await withTimeout(
       bridge.resumeFromCallback(chatId, query.data || "", { telegramUserId: userId }),
       150000,
-      "多比處理緊你啱啱個選擇，但今次耐咗少少。你可以稍後再試。",
+      `${persona.firstPersonStyle}處理緊你啱啱個選擇，但今次耐咗少少。你可以稍後再試。`,
     );
     if (result?.clear_inline_keyboard) {
       await clearInlineKeyboard(query);
@@ -249,7 +251,7 @@ async function handleCallbackQuery(query) {
   } catch (error) {
     await safeAnswerCallbackQuery(query.id, {
       callback_query_id: query.id,
-      text: "多比今次未處理到你個選擇。",
+      text: `${persona.firstPersonStyle}今次未處理到你個選擇。`,
       show_alert: false,
     });
     logActivity("callback_failed", {
@@ -258,7 +260,7 @@ async function handleCallbackQuery(query) {
       callback_data: String(query.data || ""),
       error: String(error.message || error),
     });
-    await reply(chatId, `多比啱啱卡住咗：${error.message}`);
+    await reply(chatId, `${persona.firstPersonStyle}啱啱卡住咗：${error.message}`);
   } finally {
     activeChatTurns.delete(String(chatId));
   }
@@ -286,15 +288,15 @@ async function replyResponse(chatId, result) {
 function normalizeBridgeReply(result) {
   if (typeof result === "string") {
     return {
-      text: tryExtractBridgeReplyText(result) || String(result || "").trim() || "多比已經處理好喇。",
+      text: tryExtractBridgeReplyText(result) || String(result || "").trim() || `${persona.firstPersonStyle}已經處理好喇。`,
       reply_markup: null,
     };
   }
   if (!result || typeof result !== "object") {
-    return { text: "多比啱啱整理唔到回覆。", reply_markup: null };
+    return { text: `${persona.firstPersonStyle}啱啱整理唔到回覆。`, reply_markup: null };
   }
   return {
-    text: tryExtractBridgeReplyText(result.text) || String(result.text || "").trim() || "多比已經幫你處理好喇。",
+    text: tryExtractBridgeReplyText(result.text) || String(result.text || "").trim() || `${persona.firstPersonStyle}已經幫你處理好喇。`,
     reply_markup: result.reply_markup || null,
   };
 }
@@ -479,15 +481,29 @@ function formatBridgeHealthPlain(health) {
 }
 
 function helpText() {
+  const summary = persona.supportsBabyLogs
+    ? "Family OS BB + 庫存 + 輕量 task。"
+    : "Family OS 屋企存貨 + 提醒任務。";
+  const examples = persona.supportsBabyLogs
+    ? [
+        "- BB 飲奶 90 ml",
+        "- BB 換片",
+        "- BB 瞓覺",
+        "- 公仔麵而家得返 4 包",
+        "- 買咗 10 隻蛋",
+      ]
+    : [
+        "- 屋企而家有咩要補貨？",
+        "- 公仔麵而家得返 4 包",
+        "- 買咗 10 隻蛋",
+        "- 提我聽日買洗潔精",
+        "- 未來幾日有咩 task 要做？",
+      ];
   return [
-    "多比而家主要幫手處理 Family OS BB + 庫存 + 輕量 task。",
+    `${persona.firstPersonStyle}而家主要幫手處理 ${summary}`,
     "",
-    "你可以咁樣同多比講：",
-    "- BB 飲奶 90 ml",
-    "- BB 換片",
-    "- BB 瞓覺",
-    "- 公仔麵而家得返 4 包",
-    "- 買咗 10 隻蛋",
+    `你可以咁樣同${persona.firstPersonStyle}講：`,
+    ...examples,
     "",
     "可用指令：",
     "/bridgehealth - 睇 bridge 狀態",
@@ -581,7 +597,7 @@ async function runSelfTest() {
     assert(callbackCalls.length === 1 && callbackCalls[0].data === "cb_1", "Self-test failed: callback flow did not invoke bridge.resumeFromCallback correctly.");
     assert(telegramCalls.some((entry) => entry.method === "answerCallbackQuery"), "Self-test failed: callback flow did not answer the callback query.");
     assert(telegramCalls.some((entry) => entry.method === "editMessageReplyMarkup"), "Self-test failed: callback flow did not clear the inline keyboard.");
-    assert(replies.some((entry) => entry.text === "多比收到喇，你揀咗：普通飲水"), "Self-test failed: callback flow did not send the callback ack.");
+    assert(replies.some((entry) => entry.text === `${persona.firstPersonStyle}收到喇，你揀咗：普通飲水`), "Self-test failed: callback flow did not send the callback ack.");
     assert(replies.some((entry) => entry.text === "picked"), "Self-test failed: callback flow did not send the reply.");
   } finally {
     reply = originalReply;
@@ -616,14 +632,14 @@ function splitCsv(value) {
 function buildAckText(text) {
   const summary = String(text || "").replace(/\s+/g, " ").trim();
   const preview = summary.length > 80 ? `${summary.slice(0, 80)}...` : summary;
-  return `多比收到，等多比而家幫你處理：${preview}`;
+  return `${persona.firstPersonStyle}收到，等${persona.firstPersonStyle}而家幫你處理：${preview}`;
 }
 function buildCallbackAckText(query) {
   const selectedLabel = findCallbackButtonLabel(query);
   if (selectedLabel) {
-    return `多比收到喇，你揀咗：${selectedLabel}`;
+    return `${persona.firstPersonStyle}收到喇，你揀咗：${selectedLabel}`;
   }
-  return "多比收到你啱啱個選擇喇，我而家接住幫你處理。";
+  return `${persona.firstPersonStyle}收到你啱啱個選擇喇，我而家接住幫你處理。`;
 }
 
 function findCallbackButtonLabel(query) {

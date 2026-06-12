@@ -6,10 +6,12 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { Codex } from "@openai/codex-sdk";
 import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
+import { loadFamilyOsPersona } from "./persona_config.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const runtimePaths = resolveFamilyOsPaths();
 ensureRuntimeDirectories(runtimePaths);
+const persona = loadFamilyOsPersona();
 const defaultWorkspace = runtimePaths.workspaceRoot;
 const defaultStatePath = runtimePaths.bridgeStatePath;
 const bridgeErrorLogPath = runtimePaths.bridgeErrorLogPath;
@@ -103,6 +105,7 @@ export class CodexBridge {
     this.codex = new Codex();
     this.runtimeConfig = readRuntimeConfig(this.runtimeConfigPath);
     this.reminderRecipientMap = readReminderRecipientMap(this.reminderConfigPath);
+    this.persona = persona;
     this.runtimeKnowledgeRoot = path.resolve(this.workspace, this.runtimeConfig.runtime_knowledge_root);
     this.bridgeCommands = Object.fromEntries(
       Object.entries(this.runtimeConfig.bridge_commands).map(([commandId, commandDef]) => [
@@ -187,7 +190,7 @@ export class CodexBridge {
     const chatState = this.getChatState(stateKey, false);
     if (!chatState) {
       return {
-        text: "多比唔記得上次嗰個追問喇，請再講一次。",
+        text: `${persona.firstPersonStyle}唔記得上次嗰個追問喇，請再講一次。`,
         clear_inline_keyboard: true,
       };
     }
@@ -199,7 +202,7 @@ export class CodexBridge {
       chatState.updated_at = new Date().toISOString();
       this.saveState();
       return {
-        text: "多比搵唔返之前嗰個選項喇，請再講一次。",
+        text: `${persona.firstPersonStyle}搵唔返之前嗰個選項喇，請再講一次。`,
         clear_inline_keyboard: true,
       };
     }
@@ -417,7 +420,7 @@ export class CodexBridge {
       "Allowed runtime commands:",
       bridgeCommands,
       "Use status=reply, status=clarify, or status=desktop_required only when you are ready for a user-facing answer.",
-      "Use Cantonese and a humble Dobby-like household-helper tone in reply_text only.",
+      `Use Cantonese and a humble household-helper tone in reply_text only. When speaking in first person, use "${this.persona.firstPersonStyle}".`,
       `Telegram user ID: ${telegramUserId || ""}`,
       ...(senderIdentityBlock ? ["", senderIdentityBlock] : []),
       "",
@@ -481,7 +484,7 @@ export class CodexBridge {
     if (envelope.status === "clarify") {
       const question = envelope.clarification?.question
         || envelope.reply_text
-        || "多比想再問清楚一點，可以補充嗎？";
+        || `${persona.firstPersonStyle}想再問清楚一點，可以補充嗎？`;
       const choices = Array.isArray(envelope.clarification?.choices) ? envelope.clarification.choices : [];
       const pendingChoices = [];
       for (const choice of choices) {
@@ -1167,7 +1170,7 @@ function buildBridgeStepLimitFallbackEnvelope({
   }
 
   const desktopReply = hasStateChangingSuccess
-    ? "多比今次行到太多步喇。為免重覆改動資料，我先停喺度；你可以叫我查一查最新結果，或者改用 Desktop 再處理複雜調整。"
+    ? `${persona.firstPersonStyle}今次行到太多步喇。為免重覆改動資料，我先停喺度；你可以叫我查一查最新結果，或者改用 Desktop 再處理複雜調整。`
     : buildDesktopRequiredReplyFromExecution(latestExecutionEntry);
 
   return {
@@ -1206,16 +1209,16 @@ function deriveBridgeClarificationQuestionFromExecutionHistory(executionHistory,
 
   const action = String(commandRequest?.argv?.[0] || "").trim();
   if (action === "inventory_unit_preflight") {
-    return "多比仲差少少資料先可以安全記錄，你想用邊個 item 名稱或者單位呀？";
+    return `${persona.firstPersonStyle}仲差少少資料先可以安全記錄，你想用邊個 item 名稱或者單位呀？`;
   }
   if (["query_tasks", "update_task", "append_task"].includes(action)) {
-    return "多比想先確認清楚係邊一個 task。你可以講多一句任務名稱、日期、時間，或者地點嗎？";
+    return `${persona.firstPersonStyle}想先確認清楚係邊一個 task。你可以講多一句任務名稱、日期、時間，或者地點嗎？`;
   }
   if (["record_inventory_consume_batch", "record_inventory_purchase_batch", "set_inventory_stock_level", "update_inventory_expiry_date", "upsert_inventory_item"].includes(action)) {
-    return "多比想先確認清楚係邊樣存貨，同埋用咩單位去記。你可以講多一句 item 名稱或者單位嗎？";
+    return `${persona.firstPersonStyle}想先確認清楚係邊樣存貨，同埋用咩單位去記。你可以講多一句 item 名稱或者單位嗎？`;
   }
   if (String(userText || "").trim()) {
-    return "多比仲差少少資料先可以安全寫入。你可以用自然語言講多一句，講清楚想改邊樣、數量或者時間嗎？";
+    return `${persona.firstPersonStyle}仲差少少資料先可以安全寫入。你可以用自然語言講多一句，講清楚想改邊樣、數量或者時間嗎？`;
   }
   return "";
 }
@@ -1236,9 +1239,9 @@ function buildDesktopRequiredReplyFromExecution(executionEntry) {
     || "",
   ).trim();
   if (/timed out|timeout/i.test(errorText)) {
-    return "多比今次等得太耐都未安全完成，呢類情況改用 Desktop 會穩陣啲。";
+    return `${persona.firstPersonStyle}今次等得太耐都未安全完成，呢類情況改用 Desktop 會穩陣啲。`;
   }
-  return "多比今次行到太多步都未安全收口，呢個情況我建議改用 Desktop 再處理。";
+  return `${persona.firstPersonStyle}今次行到太多步都未安全收口，呢個情況我建議改用 Desktop 再處理。`;
 }
 
 function formatInventoryUnitForUser(unit) {

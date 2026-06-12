@@ -1,5 +1,6 @@
 ﻿import fs from "node:fs";
 import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
+import { loadFamilyOsPersona } from "./persona_config.mjs";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const runtimePaths = resolveFamilyOsPaths();
@@ -12,6 +13,7 @@ const fatalLogPath = runtimePaths.reminderFatalLogPath;
 const isSelfTest = process.argv.includes("--self-test");
 const isDryRun = process.argv.includes("--dry-run");
 const dueNowCatchupGraceMs = 5 * 60000;
+const persona = loadFamilyOsPersona();
 
 process.on("uncaughtException", (error) => {
   logFatal("uncaughtException", error);
@@ -288,7 +290,7 @@ function buildDailyDigestMessage(
     lines.push(...digestTasks.slice(0, 8).flatMap((task) => formatTaskWithHints(task, snapshot.taskContextHints, timezone, now, { limit: 1 })));
   } else if (skippedTaskReminderCount > 0) {
     if (lines.length > 1) lines.push("");
-    lines.push("今日要留意嘅 task，多比啱啱已經另外提咗你喇。");
+    lines.push(`今日要留意嘅 task，${persona.firstPersonStyle}啱啱已經另外提咗你喇。`);
   }
   if (lines.length === 1) {
     lines.push("今日暫時冇特別要跟進嘅低存貨或者 task。");
