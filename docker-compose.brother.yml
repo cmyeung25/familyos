@@ -1,0 +1,62 @@
+services:
+  familyos-brother-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: familyos:brother
+    env_file:
+      - ./instances/brother/.env
+    environment:
+      FAMILY_OS_SERVICE_MODE: bot
+      FAMILY_OS_HEALTHCHECK_MODE: bot
+      FAMILY_OS_INSTANCE_ROOT: /data/instance
+      FAMILY_OS_CONFIG_ROOT: /data/instance/config
+      FAMILY_OS_STATE_ROOT: /data/instance/state
+      FAMILY_OS_LOGS_ROOT: /data/instance/logs
+      FAMILY_OS_CODEX_HOME: /data/instance/.codex-home
+      FAMILY_OS_BOT_CONFIG_PATH: /data/instance/secrets/local-bot-config.json
+      FAMILY_OS_API_CONFIG_PATH: /data/instance/secrets/local-api-config.json
+      FAMILY_OS_REMINDER_CONFIG_PATH: /data/instance/config/reminder-config.json
+      FAMILY_OS_RUNTIME_CONFIG_PATH: /data/instance/config/telegram-runtime.json
+    volumes:
+      - ./instances/brother:/data/instance
+      - ./instances/brother:/app/instances/brother
+    command: ["bot"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  familyos-brother-reminder:
+    image: familyos:brother
+    depends_on:
+      familyos-brother-bot:
+        condition: service_started
+    env_file:
+      - ./instances/brother/.env
+    environment:
+      FAMILY_OS_SERVICE_MODE: reminder
+      FAMILY_OS_HEALTHCHECK_MODE: reminder
+      FAMILY_OS_INSTANCE_ROOT: /data/instance
+      FAMILY_OS_CONFIG_ROOT: /data/instance/config
+      FAMILY_OS_STATE_ROOT: /data/instance/state
+      FAMILY_OS_LOGS_ROOT: /data/instance/logs
+      FAMILY_OS_CODEX_HOME: /data/instance/.codex-home
+      FAMILY_OS_BOT_CONFIG_PATH: /data/instance/secrets/local-bot-config.json
+      FAMILY_OS_API_CONFIG_PATH: /data/instance/secrets/local-api-config.json
+      FAMILY_OS_REMINDER_CONFIG_PATH: /data/instance/config/reminder-config.json
+      FAMILY_OS_RUNTIME_CONFIG_PATH: /data/instance/config/telegram-runtime.json
+    volumes:
+      - ./instances/brother:/data/instance
+      - ./instances/brother:/app/instances/brother
+    command: ["reminder"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
