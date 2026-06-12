@@ -29,6 +29,20 @@ Not committed here:
 
 - `TELEGRAM_ALLOWED_USER_IDS`
 - `FAMILY_OS_API_KEY`
-- real recipient `telegram_user_id` / `chat_id`
 - `instances/brother/.codex-home/auth.json` if this instance also uses Codex login
 - optional `secrets/local-bot-config.json` / `secrets/local-api-config.json` if you keep the local secret-file path convention
+
+## Reminder recipient IDs
+
+If the Family OS `people` sheet already contains the matching
+`person_id -> telegram_user_id` rows, the reminder worker can now hydrate each
+recipient `telegram_user_id` and `chat_id` at startup from Sheets.
+
+That means `config/reminder-config.json` can stay focused on:
+
+- `person_scope.primary_person_id`
+- `owner_person_ids` / `related_person_ids`
+- reminder preferences and quiet hours
+
+For private Telegram chats, `chat_id` defaults to the same value as
+`telegram_user_id`.

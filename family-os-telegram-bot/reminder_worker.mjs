@@ -36,7 +36,7 @@ const runtime = {
   apiKey: requiredEnv("FAMILY_OS_API_KEY"),
 };
 
-const config = readReminderConfig(configPath);
+const config = await loadReminderConfig(runtime, configPath);
 const state = readJsonFile(statePath, { version: 1, recipients: {} });
 
 try {
@@ -381,6 +381,66 @@ function readReminderConfig(filePath) {
     timezone: config.timezone || "Asia/Hong_Kong",
     recipients: config.recipients.map(normalizeRecipientConfig),
   };
+}
+
+async function loadReminderConfig(runtimeConfig, filePath) {
+  const config = readReminderConfig(filePath);
+  let people = [];
+  try {
+    const result = await invokeFamilyOsApi(runtimeConfig, "get_telegram_allowlist", {});
+    people = normalizeTelegramPeopleResult(result);
+  } catch (error) {
+    logActivity("recipient_sheet_lookup_failed", {
+      error: String(error?.message || error),
+    });
+  }
+
+  const hydrated = applySheetTelegramPeopleToConfig(config, people);
+  logActivity("recipient_sheet_lookup_completed", {
+    configured_recipients: config.recipients.length,
+    sheet_people_count: people.length,
+    resolved_recipients: hydrated.recipients.filter((recipient) => recipient.telegram_user_id || recipient.chat_id).length,
+  });
+  return hydrated;
+}
+
+function applySheetTelegramPeopleToConfig(config, people) {
+  const peopleById = new Map(
+    normalizeTelegramPeopleResult({ people }).map((person) => [person.person_id, person]),
+  );
+  return {
+    ...config,
+    recipients: config.recipients.map((recipient) => hydrateRecipientTelegramTarget(recipient, peopleById)),
+  };
+}
+
+function hydrateRecipientTelegramTarget(recipient, peopleById) {
+  const candidatePersonIds = normalizeStringList([
+    recipient.person_scope?.primary_person_id,
+    ...(recipient.person_scope?.owner_person_ids || []),
+  ]);
+  const match = candidatePersonIds
+    .map((personId) => peopleById.get(personId))
+    .find((person) => person?.telegram_user_id);
+  const telegramUserId = String(recipient.telegram_user_id || match?.telegram_user_id || "");
+  const chatId = String(recipient.chat_id || telegramUserId || "");
+  return {
+    ...recipient,
+    name: String(recipient.name || match?.display_name || telegramUserId || chatId || "recipient"),
+    telegram_user_id: telegramUserId,
+    chat_id: chatId,
+  };
+}
+
+function normalizeTelegramPeopleResult(result) {
+  const people = Array.isArray(result?.people) ? result.people : Array.isArray(result) ? result : [];
+  return people
+    .map((person) => ({
+      person_id: String(person?.person_id || "").trim(),
+      display_name: String(person?.display_name || "").trim(),
+      telegram_user_id: String(person?.telegram_user_id || "").trim(),
+    }))
+    .filter((person) => person.person_id && /^\d+$/.test(person.telegram_user_id));
 }
 
 function normalizeRecipientConfig(recipient) {
@@ -903,6 +963,33 @@ function firstNonEmptyString(...values) {
 }
 
 function runSelfTest() {
+  const hydratedConfig = applySheetTelegramPeopleToConfig({
+    timezone: "Asia/Hong_Kong",
+    recipients: [
+      normalizeRecipientConfig({
+        enabled: true,
+        name: "owner",
+        person_scope: {
+          primary_person_id: "per_husband",
+          owner_person_ids: ["per_husband"],
+          related_person_ids: ["per_husband", "per_wife", "per_baby"],
+        },
+        preferences: {
+          task_due_now: true,
+        },
+      }),
+    ],
+  }, [
+    { person_id: "per_husband", display_name: "丈夫", telegram_user_id: "7476829331" },
+    { person_id: "per_wife", display_name: "太太", telegram_user_id: "5070419916" },
+  ]);
+  if (hydratedConfig.recipients[0]?.telegram_user_id !== "7476829331") {
+    throw new Error("Expected recipient telegram_user_id to be hydrated from people sheet.");
+  }
+  if (hydratedConfig.recipients[0]?.chat_id !== "7476829331") {
+    throw new Error("Expected recipient chat_id to default to hydrated telegram_user_id.");
+  }
+
   const now = new Date("2026-06-04T09:30:00+08:00");
   const config = {
     timezone: "Asia/Hong_Kong",

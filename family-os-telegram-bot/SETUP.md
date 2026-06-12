@@ -138,6 +138,19 @@ Per-recipient preferences live in:
 family-os-telegram-bot/reminder-config.json
 ```
 
+At worker startup, recipient transport IDs can now be hydrated from Family OS
+Sheets `people.telegram_user_id` through the existing Apps Script allowlist
+route. If a reminder recipient has `person_scope.primary_person_id` or matching
+`owner_person_ids`, the worker can fill `telegram_user_id` and `chat_id`
+automatically. This keeps the per-instance reminder config focused on:
+
+- person scope
+- reminder preferences
+- quiet hours
+
+For Telegram private chats, `chat_id` defaults to the same numeric value as
+`telegram_user_id`.
+
 Run a dry run locally:
 
 ```powershell
