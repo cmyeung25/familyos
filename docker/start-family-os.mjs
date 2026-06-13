@@ -45,6 +45,9 @@ switch (serviceMode) {
   case "reminder-self-test":
     await runNodeScript("reminder_worker.mjs", { scriptArgs: ["--self-test"] });
     break;
+  case "health-server":
+    await runWorkspaceScript(path.join("docker", "health_server.mjs"));
+    break;
   default:
     throw new Error(`Unsupported FAMILY_OS_SERVICE_MODE: ${serviceMode}`);
 }
@@ -154,10 +157,19 @@ async function runReminderLoop() {
 
 function runNodeScript(scriptName, { nodeArgs = [], scriptArgs = [] } = {}) {
   const scriptPath = path.join(botRoot, scriptName);
+  return runScriptPath(scriptPath, { cwd: botRoot, nodeArgs, scriptArgs, label: scriptName });
+}
+
+function runWorkspaceScript(relativePath, { nodeArgs = [], scriptArgs = [] } = {}) {
+  const scriptPath = path.join(appRoot, relativePath);
+  return runScriptPath(scriptPath, { cwd: appRoot, nodeArgs, scriptArgs, label: relativePath });
+}
+
+function runScriptPath(scriptPath, { cwd, nodeArgs = [], scriptArgs = [], label = path.basename(scriptPath) } = {}) {
   const args = [...nodeArgs, scriptPath, ...scriptArgs];
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
-      cwd: botRoot,
+      cwd,
       env: process.env,
       stdio: "inherit",
     });
@@ -179,11 +191,11 @@ function runNodeScript(scriptName, { nodeArgs = [], scriptArgs = [] } = {}) {
       process.removeListener("SIGINT", forwardSignal);
       process.removeListener("SIGTERM", forwardSignal);
       if (signal) {
-        reject(new Error(`${scriptName} exited via signal ${signal}.`));
+        reject(new Error(`${label} exited via signal ${signal}.`));
         return;
       }
       if (code !== 0) {
-        reject(new Error(`${scriptName} exited with code ${code}.`));
+        reject(new Error(`${label} exited with code ${code}.`));
         return;
       }
       resolve();

@@ -62,4 +62,13 @@ The bot now supports these path overrides:
 - `FAMILY_OS_REMINDER_CONFIG_PATH`
 - `FAMILY_OS_RUNTIME_CONFIG_PATH`
 
+## Uptime monitoring
+
+Synology + Uptime Kuma monitoring is now scaffolded with:
+
+- `docker/health_state.mjs`
+- `docker/health_server.mjs`
+- `docker-compose.monitoring.example.yml`
+- `docs/synology-uptime-monitoring.md`
+
 See [instances/example/README.md](/C:/Users/user/OneDrive/文件/屋企清單/instances/example/README.md) for a tenant-style scaffold.

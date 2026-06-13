@@ -1,0 +1,17 @@
+services:
+  familyos-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: familyos:monitor
+    environment:
+      FAMILY_OS_SERVICE_MODE: health-server
+      FAMILY_OS_MONITOR_BIND: 0.0.0.0
+      FAMILY_OS_MONITOR_PORT: 8787
+      FAMILY_OS_MONITOR_TOKEN: change-me-before-rollout
+      FAMILY_OS_MONITOR_INSTANCES: gary=/data/instances/gary,brother=/data/instances/brother
+    volumes:
+      - ./instances:/data/instances:ro
+    ports:
+      - "8787:8787"
+    restart: unless-stopped
