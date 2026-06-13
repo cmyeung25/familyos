@@ -14,4 +14,5 @@ services:
       - ./instances:/data/instances:ro
     ports:
       - "8787:8787"
+    command: ["health-server"]
     restart: unless-stopped
