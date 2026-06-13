@@ -82,6 +82,7 @@ const defaultRuntimeConfig = {
     bb_log_templates: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "bb-log-templates.md"),
     inventory_flows: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "inventory-flows.md"),
     task_management: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "task-management.md"),
+    household_memory: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "household-memory.md"),
     unit_normalization: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "unit-normalization.md"),
     ambiguity_policy: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "ambiguity-policy.md"),
     self_enhance_policy: path.join("plugins-staging", "family-os-bb-inventory", "skills", "family-os-bb-inventory", "references", "self-enhance-policy.md"),
@@ -440,6 +441,9 @@ export class CodexBridge {
       "",
       "Reference: task-management.md",
       promptContext.references.task_management,
+      "",
+      "Reference: household-memory.md",
+      promptContext.references.household_memory,
       "",
       "Reference: unit-normalization.md",
       promptContext.references.unit_normalization,
@@ -1009,7 +1013,7 @@ function looksLikeImmediateCorrection(userText, lastAction, entities) {
   const text = String(userText || "").trim();
   if (!text || !lastAction || entities.length === 0) return false;
   const actionSet = new Set(lastAction.actions.map((entry) => String(entry || "").trim()));
-  const recentWrite = ["append_task", "update_task", "append_baby_log", "record_inventory_purchase_batch", "record_inventory_consume_batch", "set_inventory_stock_level", "update_inventory_expiry_date", "upsert_inventory_item"]
+  const recentWrite = ["append_task", "update_task", "append_baby_log", "record_inventory_purchase_batch", "record_inventory_consume_batch", "set_inventory_stock_level", "update_inventory_expiry_date", "upsert_inventory_item", "append_household_memory"]
     .some((action) => actionSet.has(action));
   if (!recentWrite) return false;
   if (/(先啱|先岩|更正|改返|改做|唔係|不是|其實|今日係|應該係|搞錯|記錯)/.test(text)) return true;
@@ -1028,6 +1032,9 @@ function formatResultEntityForPrompt(entity) {
   if (entity.status) parts.push(`status=${entity.status}`);
   if (entity.category) parts.push(`category=${entity.category}`);
   if (entity.unit) parts.push(`unit=${entity.unit}`);
+  if (entity.location) parts.push(`location=${entity.location}`);
+  if (entity.memory_type) parts.push(`memory_type=${entity.memory_type}`);
+  if (entity.confidence) parts.push(`confidence=${entity.confidence}`);
   if (entity.next_expiry_date) parts.push(`next_expiry_date=${entity.next_expiry_date}`);
   if (entity.quantity_on_hand !== "") parts.push(`quantity_on_hand=${entity.quantity_on_hand}`);
   return parts.join(" ");
@@ -1090,6 +1097,7 @@ function isStateChangingAction(executionEntry) {
     "set_inventory_stock_level",
     "update_inventory_expiry_date",
     "upsert_inventory_item",
+    "append_household_memory",
   ]).has(action);
 }
 
@@ -1099,6 +1107,13 @@ function extractResultEntitiesFromExecution(action, result) {
   if (["append_task", "update_task"].includes(normalizedAction)) {
     const entity = buildTaskResultEntity(result);
     return entity ? [entity] : [];
+  }
+  if (normalizedAction === "append_household_memory") {
+    const entity = buildHouseholdMemoryResultEntity(result);
+    return entity ? [entity] : [];
+  }
+  if (normalizedAction === "query_household_memory") {
+    return Array.isArray(result) ? result.map(buildHouseholdMemoryResultEntity).filter(Boolean).slice(0, 5) : [];
   }
   if (["query_tasks", "get_upcoming_tasks", "get_overdue_tasks"].includes(normalizedAction)) {
     return Array.isArray(result) ? result.map(buildTaskResultEntity).filter(Boolean).slice(0, 5) : [];
@@ -1140,6 +1155,20 @@ function buildInventoryResultEntity(item) {
     next_expiry_date: item.next_expiry_date,
     quantity_on_hand: item.quantity_on_hand,
     category: item.category,
+  });
+}
+
+function buildHouseholdMemoryResultEntity(memory) {
+  if (!memory || typeof memory !== "object") return null;
+  return normalizeResultEntity({
+    kind: "household_memory",
+    entity_id: memory.memory_id,
+    name: memory.subject,
+    location: memory.location,
+    status: memory.status,
+    category: memory.category,
+    memory_type: memory.memory_type,
+    confidence: memory.confidence,
   });
 }
 
@@ -1213,6 +1242,9 @@ function deriveBridgeClarificationQuestionFromExecutionHistory(executionHistory,
   }
   if (["query_tasks", "update_task", "append_task"].includes(action)) {
     return `${persona.firstPersonStyle}想先確認清楚係邊一個 task。你可以講多一句任務名稱、日期、時間，或者地點嗎？`;
+  }
+  if (["query_household_memory", "append_household_memory"].includes(action)) {
+    return `${persona.firstPersonStyle}想幫你處理屋企備忘，但而家仲未夠清楚係邊樣物件或者放喺邊度。你再講多次個 subject 或 location，${persona.firstPersonStyle}就可以再試。`;
   }
   if (["record_inventory_consume_batch", "record_inventory_purchase_batch", "set_inventory_stock_level", "update_inventory_expiry_date", "upsert_inventory_item"].includes(action)) {
     return `${persona.firstPersonStyle}想先確認清楚係邊樣存貨，同埋用咩單位去記。你可以講多一句 item 名稱或者單位嗎？`;
@@ -1443,6 +1475,7 @@ function readRuntimeConfig(filePath) {
       bb_log_templates: String(parsed.references.bb_log_templates || "").trim() || defaultRuntimeConfig.references.bb_log_templates,
       inventory_flows: String(parsed.references.inventory_flows || "").trim() || defaultRuntimeConfig.references.inventory_flows,
       task_management: String(parsed.references.task_management || "").trim() || defaultRuntimeConfig.references.task_management,
+      household_memory: String(parsed.references.household_memory || "").trim() || defaultRuntimeConfig.references.household_memory,
       unit_normalization: String(parsed.references.unit_normalization || "").trim() || defaultRuntimeConfig.references.unit_normalization,
       ambiguity_policy: String(parsed.references.ambiguity_policy || "").trim() || defaultRuntimeConfig.references.ambiguity_policy,
       self_enhance_policy: String(parsed.references.self_enhance_policy || "").trim() || defaultRuntimeConfig.references.self_enhance_policy,

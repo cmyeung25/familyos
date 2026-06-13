@@ -3,7 +3,7 @@ name: family-os-bb-inventory
 description: Handle the narrow Family OS Telegram V2 runtime for BB logs, inventory, and lightweight household tasks. Use with the paired `family-os-bb-inventory-api` skill and the plugin runtime knowledge files.
 ---
 
-# Family OS BB + Inventory + Task V2
+# Family OS BB + Inventory + Task + Household Memory V2
 
 Use this skill only for the Telegram V2 runtime.
 
@@ -38,6 +38,13 @@ Supported task operations:
 - query overdue tasks
 - update a clearly identified existing task
 - cancel a clearly identified existing task
+
+Supported household memory operations:
+
+- remember a durable item location
+- remember a reusable household fact
+- remember an explicit household preference
+- query previously recorded household memory
 
 Everything else is out of scope and should return `desktop_required`.
 
@@ -133,9 +140,42 @@ Read these references only as needed:
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/bb-log-templates.md`
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/inventory-flows.md`
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/task-management.md`
+- `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/household-memory.md`
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/unit-normalization.md`
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/ambiguity-policy.md`
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/self-enhance-policy.md`
+
+## Household Memory
+
+Use household memory when the user wants the bot to remember something durable that is not mainly a timed reminder and not mainly a stock count.
+
+Good examples:
+
+- `幫我記住成長椅工具放咗喺工具箱`
+- `記住太太鍾意買呢隻紙巾`
+- `工人姐姐通常星期日放假`
+- `成長椅工具放咗去邊？`
+
+Use these defaults:
+
+- choose `memory_type=item_location` when the user clearly says where an object is stored
+- choose `memory_type=preference` only when the user clearly states a stable preference
+- otherwise choose `memory_type=fact`
+
+When storing an item location:
+
+- capture the thing as `subject`
+- capture the place as `location`
+- keep `status=active` unless the user clearly says the old location is no longer valid
+- prefer a short factual `value_text`
+
+When querying household memory:
+
+- search by the object / subject first
+- include location hints when the user gave them
+- if several plausible memories match, ask a short clarification instead of guessing
+
+Do not turn a durable household memory into a `task` unless the user actually wants a timed reminder or follow-up action.
 
 ## Clarification Rules
 

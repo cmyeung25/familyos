@@ -33,6 +33,7 @@
     "bb_log_templates": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/bb-log-templates.md",
     "inventory_flows": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/inventory-flows.md",
     "task_management": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/task-management.md",
+    "household_memory": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/household-memory.md",
     "unit_normalization": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/unit-normalization.md",
     "ambiguity_policy": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/ambiguity-policy.md",
     "self_enhance_policy": "plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/self-enhance-policy.md"

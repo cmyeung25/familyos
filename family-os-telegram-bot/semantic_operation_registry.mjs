@@ -35,6 +35,16 @@ export function createSemanticOperationBuilder(deps) {
     };
   }
 
+  function readText(operation, ...keys) {
+    for (const key of keys) {
+      const value = operation?.[key];
+      if (value === undefined || value === null) continue;
+      const text = String(value).trim();
+      if (text) return text;
+    }
+    return "";
+  }
+
   function buildInventoryOperationState(operation, userText, snapshot) {
     const itemName = String(operation?.item_name || "").trim();
     const quantity = Number(operation?.quantity);
@@ -178,6 +188,96 @@ export function createSemanticOperationBuilder(deps) {
       payload: { limit: 10 },
       request_text: userText,
     });
+  }
+
+  function normalizeHouseholdMemoryType(operation, userText) {
+    const explicitType = readText(operation, "memory_type", "type", "scope").toLowerCase();
+    if (["item_location", "location"].includes(explicitType)) return "item_location";
+    if (["preference", "prefer"].includes(explicitType)) return "preference";
+    if (["fact", "info", "note"].includes(explicitType)) return "fact";
+
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    if (location) return "item_location";
+
+    const combined = [
+      readText(operation, "subject", "item_name", "title", "name"),
+      readText(operation, "value_text", "description", "remarks"),
+      userText,
+    ].join(" ").toLowerCase();
+    if (/(prefer|preference|favorite|favourite|like)/.test(combined)) return "preference";
+    return "fact";
+  }
+
+  function inferHouseholdMemoryQueryType(operation, userText) {
+    const explicitType = readText(operation, "memory_type", "type", "scope").toLowerCase();
+    if (["item_location", "location"].includes(explicitType)) return "item_location";
+    if (["preference", "prefer"].includes(explicitType)) return "preference";
+    if (["fact", "info", "note"].includes(explicitType)) return "fact";
+
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    if (location) return "item_location";
+
+    const combined = [
+      readText(operation, "subject", "item_name", "title", "name"),
+      readText(operation, "query_text", "query", "text", "keyword"),
+      userText,
+    ].join(" ").toLowerCase();
+    if (/(prefer|preference|favorite|favourite|like)/.test(combined)) return "preference";
+    return "";
+  }
+
+  function buildHouseholdMemoryCreatePlan(operation, userText) {
+    const subject = readText(operation, "subject", "item_name", "object_name", "document_name", "title", "name");
+    if (!subject) return null;
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    const memoryType = normalizeHouseholdMemoryType(operation, userText);
+    const valueText = readText(operation, "value_text", "description", "note", "value")
+      || (memoryType === "item_location" && location ? `放咗喺${location}` : "");
+    return buildPlan(
+      operation.entity,
+      operation.action,
+      "record household memory",
+      `Record household memory for ${subject}.`,
+      {
+        action: "append_household_memory",
+        payload: {
+          memory_type: memoryType,
+          subject,
+          value_text: valueText,
+          location,
+          category: readText(operation, "category", "category_hint"),
+          owner_person_id: readText(operation, "owner_person_id", "owner", "person_id"),
+          related_person_id: readText(operation, "related_person_id", "related_person", "about_person_id"),
+          remarks: readText(operation, "remarks") || "Recorded through Telegram household memory flow.",
+        },
+        request_text: userText,
+      },
+    );
+  }
+
+  function buildHouseholdMemoryQueryPlan(operation, userText) {
+    const subject = readText(operation, "subject", "item_name", "object_name", "document_name", "title", "name");
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    return buildPlan(
+      operation.entity,
+      operation.action,
+      "query household memory",
+      subject ? `Look up household memory for ${subject}.` : "Look up household memory.",
+      {
+        action: "query_household_memory",
+        payload: {
+          limit: 10,
+          memory_type: inferHouseholdMemoryQueryType(operation, userText),
+          category: readText(operation, "category", "category_hint"),
+          owner_person_id: readText(operation, "owner_person_id", "owner", "person_id"),
+          related_person_id: readText(operation, "related_person_id", "related_person", "about_person_id"),
+          subject,
+          location,
+          query_text: readText(operation, "query_text", "query", "text", "keyword") || subject || String(userText || "").trim(),
+        },
+        request_text: userText,
+      },
+    );
   }
 
   function buildFinanceRecordPlan(operation, userText) {
@@ -514,6 +614,9 @@ export function createSemanticOperationBuilder(deps) {
     "inventory:restock": buildInventoryRestockPlan,
     "baby:query": buildBabyQueryPlan,
     "baby:record": buildBabyRecordPlan,
+    "memory:create": buildHouseholdMemoryCreatePlan,
+    "memory:record": buildHouseholdMemoryCreatePlan,
+    "memory:query": buildHouseholdMemoryQueryPlan,
     "task:create": buildTaskCreatePlan,
     "task:query": buildTaskQueryPlan,
     "finance:record": buildFinanceRecordPlan,

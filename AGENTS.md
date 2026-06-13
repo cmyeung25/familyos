@@ -2,6 +2,15 @@
 
 This folder is the working area for the Family OS household management system.
 
+## Read Shared Planning Docs
+
+Before non-trivial architecture, roadmap, schema, or multi-step feature work, also read:
+
+- `docs/familyos-roadmap.md`
+- `docs/familyos-engineering-principles.md`
+
+Treat those docs as the shared project status and delivery rules for future Family OS work. Update them when a phase meaningfully changes or a new cross-cutting engineering rule is introduced.
+
 ## Use The Family OS Skill First
 
 For any request related to household data or the Family OS Google Sheets workbook, load and follow the `family-os-sheets` skill before taking action.

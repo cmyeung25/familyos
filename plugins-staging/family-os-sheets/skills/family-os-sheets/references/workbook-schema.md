@@ -23,6 +23,7 @@ Expected workbook schema: `family_os_poc_v1`.
 | `asset_snapshots` | `asset_snapshot_id` | point-in-time account values | `net_value`, `is_latest`, `cash_asset_value_hkd` |
 | `inventory_items` | `item_id` | household item master | `quantity_on_hand`, `last_movement_at`, `is_low_stock`, `is_expiring_soon`, `needs_restock` |
 | `inventory_movements` | `movement_id` | purchases, consumption, adjustments | none |
+| `household_memory` | `memory_id` | durable household memory such as item locations, facts, and preferences | none |
 | `baby_log` | `baby_log_id` | baby event log | `duration_minutes`, `baby_age_days` |
 | `caregivers` | `caregiver_id` | helper and confinement nanny master | `days_to_contract_end` |
 | `caregiver_records` | `caregiver_record_id` | schedules, leave, rules, handover | none |

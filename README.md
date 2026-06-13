@@ -71,4 +71,11 @@ Synology + Uptime Kuma monitoring is now scaffolded with:
 - `docker-compose.monitoring.example.yml`
 - `docs/synology-uptime-monitoring.md`
 
+## Shared Planning Docs
+
+For roadmap, project status, and cross-agent delivery rules, read:
+
+- `docs/familyos-roadmap.md`
+- `docs/familyos-engineering-principles.md`
+
 See [instances/example/README.md](/C:/Users/user/OneDrive/文件/屋企清單/instances/example/README.md) for a tenant-style scaffold.

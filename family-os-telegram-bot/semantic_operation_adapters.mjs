@@ -1,6 +1,7 @@
 export function normalizeSemanticEntity(value) {
   const text = String(value || "").trim().toLowerCase();
   if (!text) return "";
+  if (["memory", "household_memory", "location", "item_location", "fact", "preference", "物件", "位置", "擺位", "備忘"].includes(text)) return "memory";
   if (["inventory", "stock", "item", "items", "庫存", "存貨", "物資", "用品", "groceries"].includes(text)) return "inventory";
   if (["baby", "bb", "嬰兒", "寶寶"].includes(text)) return "baby";
   if (["task", "tasks", "reminder", "todo", "to-do", "提醒", "待辦", "工作"].includes(text)) return "task";
@@ -739,6 +740,127 @@ export function createSemanticOperationPlanner(deps) {
     return buildQueryPlanFromSpec(operation, userText, QUERY_OPERATION_SPECS.task);
   }
 
+  function normalizeHouseholdMemoryType(operation, userText) {
+    const explicitType = readText(operation, "memory_type", "type", "scope").toLowerCase();
+    if (["item_location", "location"].includes(explicitType)) return "item_location";
+    if (["preference", "prefer"].includes(explicitType)) return "preference";
+    if (["fact", "info", "note"].includes(explicitType)) return "fact";
+
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    if (location) return "item_location";
+
+    const combined = [
+      readText(operation, "subject", "item_name", "title", "name"),
+      readText(operation, "value_text", "description", "remarks"),
+      userText,
+    ].join(" ").toLowerCase();
+    if (/(prefer|preference|favorite|favourite|like)/.test(combined)) return "preference";
+    return "fact";
+  }
+
+  function inferHouseholdMemoryQueryType(operation, userText) {
+    const explicitType = readText(operation, "memory_type", "type", "scope").toLowerCase();
+    if (["item_location", "location"].includes(explicitType)) return "item_location";
+    if (["preference", "prefer"].includes(explicitType)) return "preference";
+    if (["fact", "info", "note"].includes(explicitType)) return "fact";
+
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    if (location) return "item_location";
+
+    const combined = [
+      readText(operation, "subject", "item_name", "title", "name"),
+      readText(operation, "query_text", "query", "text", "keyword"),
+      userText,
+    ].join(" ").toLowerCase();
+    if (/(prefer|preference|favorite|favourite|like)/.test(combined)) return "preference";
+    return "";
+  }
+
+  function buildHouseholdMemoryCreateState(operation, userText) {
+    const subject = readText(operation, "subject", "item_name", "object_name", "document_name", "title", "name");
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    const description = readText(operation, "value_text", "description", "note", "value");
+    const remarks = readText(operation, "remarks");
+    const memoryType = inferHouseholdMemoryQueryType(operation, userText);
+    if (!subject) return null;
+    return {
+      subject,
+      location,
+      description,
+      remarks,
+      memoryType,
+      category: readText(operation, "category", "category_hint"),
+      ownerPersonId: readText(operation, "owner_person_id", "owner", "person_id"),
+      relatedPersonId: readText(operation, "related_person_id", "related_person", "about_person_id"),
+    };
+  }
+
+  function buildHouseholdMemoryQueryState(operation, userText) {
+    const subject = readText(operation, "subject", "item_name", "object_name", "document_name", "title", "name");
+    const location = readText(operation, "location", "where", "place", "storage_location");
+    const queryText = readText(operation, "query_text", "query", "text", "keyword") || subject || String(userText || "").trim();
+    const memoryType = normalizeHouseholdMemoryType(operation, userText);
+    return {
+      subject,
+      location,
+      queryText,
+      memoryType,
+      category: readText(operation, "category", "category_hint"),
+      ownerPersonId: readText(operation, "owner_person_id", "owner", "person_id"),
+      relatedPersonId: readText(operation, "related_person_id", "related_person", "about_person_id"),
+    };
+  }
+
+  function buildHouseholdMemoryCreatePlan(operation, userText) {
+    const state = buildHouseholdMemoryCreateState(operation, userText);
+    if (!state) return null;
+    const valueText = state.description || (state.memoryType === "item_location" && state.location ? `放咗喺${state.location}` : "");
+    return buildPlan(
+      operation.entity,
+      operation.action,
+      "record household memory",
+      `Record household memory for ${state.subject}.`,
+      {
+        action: "append_household_memory",
+        payload: {
+          memory_type: state.memoryType,
+          subject: state.subject,
+          value_text: valueText,
+          location: state.location,
+          category: state.category,
+          owner_person_id: state.ownerPersonId,
+          related_person_id: state.relatedPersonId,
+          remarks: state.remarks || "Recorded through Telegram household memory flow.",
+        },
+        request_text: userText,
+      },
+    );
+  }
+
+  function buildHouseholdMemoryQueryPlan(operation, userText) {
+    const state = buildHouseholdMemoryQueryState(operation, userText);
+    return buildPlan(
+      operation.entity,
+      operation.action,
+      "query household memory",
+      state.subject ? `Look up household memory for ${state.subject}.` : "Look up household memory.",
+      {
+        action: "query_household_memory",
+        payload: {
+          limit: 10,
+          memory_type: state.memoryType,
+          category: state.category,
+          owner_person_id: state.ownerPersonId,
+          related_person_id: state.relatedPersonId,
+          subject: state.subject,
+          location: state.location,
+          query_text: state.queryText,
+        },
+        request_text: userText,
+      },
+    );
+  }
+
   function buildFinanceRecordPlan(operation, userText) {
     return buildMutationPlanFromSpec(operation, userText, RECORD_OPERATION_SPECS.finance);
   }
@@ -824,6 +946,9 @@ export function createSemanticOperationPlanner(deps) {
     "inventory:restock": buildInventoryRestockPlan,
     "baby:query": buildBabyQueryPlan,
     "baby:record": buildBabyRecordPlan,
+    "memory:create": buildHouseholdMemoryCreatePlan,
+    "memory:record": buildHouseholdMemoryCreatePlan,
+    "memory:query": buildHouseholdMemoryQueryPlan,
     "task:create": buildTaskCreatePlan,
     "task:query": buildTaskQueryPlan,
     "finance:record": buildFinanceRecordPlan,

@@ -198,6 +198,7 @@ Use these narrow actions for the Telegram Codex Bridge. All reads return at most
 | --- | --- |
 | `query_tasks` | `limit`, `category`, `status`, `owner_person_id`, `related_person_id`, `related_item_id`, `from`, `to` |
 | `get_task_context_hints` | `status`, `applies_to_category`, `applies_to_related_person_id`, `applies_to_owner_person_id`, optional `limit` |
+| `query_household_memory` | `limit`, `memory_type`, `category`, `status`, `owner_person_id`, `related_person_id`, `subject`, `location`, `query_text` |
 | `query_finance_transactions` | `limit`, `month`, `type`, `category`, `payer_person_id` |
 | `get_finance_budgets` | `limit`, `month_start`, `category`, `owner_person_id` |
 | `query_asset_accounts` | `limit`, `owner_person_id`, `asset_type`, `liquidity_class`, `include_in_cash_assets`, `status` |
@@ -214,6 +215,7 @@ Use these narrow actions for the Telegram Codex Bridge. All reads return at most
 | Action | Payload |
 | --- | --- |
 | `append_task` | Task fields except IDs and formula columns |
+| `append_household_memory` | Household-memory fields except IDs and metadata |
 | `update_task` | `task_id`, `patch` |
 | `update_inventory_expiry_date` | `item_id` or `item_name`, `next_expiry_date`, optional `remarks` |
 

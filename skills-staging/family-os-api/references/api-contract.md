@@ -267,6 +267,7 @@ Use these narrow actions for the Telegram Codex Bridge. All reads return at most
 | Action | Supported filters |
 | --- | --- |
 | `query_tasks` | `limit`, `category`, `status`, `owner_person_id`, `related_person_id`, `related_item_id`, `from`, `to` |
+| `query_household_memory` | `limit`, `memory_type`, `category`, `status`, `owner_person_id`, `related_person_id`, `subject`, `location`, `query_text` |
 | `query_finance_transactions` | `limit`, `month`, `type`, `category`, `payer_person_id` |
 | `get_finance_budgets` | `limit`, `month_start`, `category`, `owner_person_id` |
 | `query_asset_accounts` | `limit`, `owner_person_id`, `asset_type`, `liquidity_class`, `include_in_cash_assets`, `status` |
@@ -283,6 +284,7 @@ Use these narrow actions for the Telegram Codex Bridge. All reads return at most
 | Action | Payload |
 | --- | --- |
 | `append_task` | Task fields except IDs and formula columns |
+| `append_household_memory` | Household-memory fields except IDs and metadata |
 | `upsert_inventory_item` | `item_id` or `item_key`, `item_name`, `category`, `unit`, optional `safety_stock`, location, brand, channel, status, remarks |
 | `set_inventory_stock_level` | `item_id` or `item_name`, `unit`, `quantity_on_hand`, optional `event_at`, remarks |
 | `update_task` | `task_id`, `patch` |

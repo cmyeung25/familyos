@@ -24,6 +24,8 @@ const allowedActions = new Set([
   "get_upcoming_tasks",
   "get_overdue_tasks",
   "get_task_context_hints",
+  "append_household_memory",
+  "query_household_memory",
 ]);
 
 const batchInventoryActions = new Set([
@@ -43,7 +45,7 @@ function argument(name) {
 
 function readRequest() {
   if (process.argv.includes("--self-test")) {
-    if (!allowedActions.has("append_baby_log") || !allowedActions.has("set_inventory_stock_level") || !allowedActions.has("update_inventory_expiry_date") || !allowedActions.has("append_task") || !allowedActions.has("get_task_context_hints")) {
+    if (!allowedActions.has("append_baby_log") || !allowedActions.has("set_inventory_stock_level") || !allowedActions.has("update_inventory_expiry_date") || !allowedActions.has("append_task") || !allowedActions.has("get_task_context_hints") || !allowedActions.has("append_household_memory") || !allowedActions.has("query_household_memory")) {
       throw new Error("Allowed action self-test failed.");
     }
     const payload = parsePayloadArgument("{\"log_type\":\"feeding\",\"value_number\":90,\"unit\":\"ml\"}");

@@ -71,6 +71,12 @@ const WRITE_COLUMNS = Object.freeze({
     "related_task_id", "status", "created_at", "updated_at", "created_by",
     "updated_by", "remarks",
   ],
+  household_memory: [
+    "memory_id", "household_id", "memory_type", "subject", "value_text",
+    "location", "category", "status", "owner_person_id", "related_person_id",
+    "tags", "aliases", "last_verified_at", "confidence", "created_at",
+    "updated_at", "created_by", "updated_by", "remarks",
+  ],
   task_context_hints: [
     "hint_id", "household_id", "status", "hint_text", "applies_to_category",
     "applies_to_keywords", "applies_to_related_person_id", "applies_to_owner_person_id",
@@ -104,6 +110,9 @@ const TASK_RECURRENCES = Object.freeze(["none", "daily", "weekly", "monthly", "q
 const CAREGIVER_RECORD_TYPES = Object.freeze(["leave", "schedule", "training", "house_rule", "handover", "reminder", "payment_note"]);
 const PROPERTY_STATUSES = Object.freeze(["researched", "to_visit", "visited", "shortlisted", "rejected", "offer_consideration", "archived"]);
 const DOCUMENT_CATEGORIES = Object.freeze(["birth_certificate", "identity_document", "marriage_certificate", "lease", "insurance", "helper_contract", "medical", "bank", "tax", "other"]);
+const HOUSEHOLD_MEMORY_TYPES = Object.freeze(["item_location", "fact", "preference"]);
+const HOUSEHOLD_MEMORY_STATUSES = Object.freeze(["active", "moved", "archived"]);
+const HOUSEHOLD_MEMORY_CONFIDENCE = Object.freeze(["confirmed", "inferred", "tentative"]);
 
 function doGet() {
   return json_({
@@ -170,6 +179,8 @@ function route_(action, payload, request) {
       return queryDocuments_(payload);
     case "get_expiring_documents":
       return getExpiringDocuments_(payload);
+    case "query_household_memory":
+      return queryHouseholdMemory_(payload);
     case "append_baby_log":
       return withWriteLock_(function () {
         return appendBabyLog_(payload, request);
@@ -232,6 +243,8 @@ function route_(action, payload, request) {
       return withWriteLock_(function () { return appendDocument_(payload, request); });
     case "update_document":
       return withWriteLock_(function () { return updateDocument_(payload, request); });
+    case "append_household_memory":
+      return withWriteLock_(function () { return appendHouseholdMemory_(payload, request); });
     default:
       throw new Error("Unsupported action: " + action);
   }
@@ -462,6 +475,58 @@ function getExpiringDocuments_(payload) {
   });
   return limitRows_(rows, safe.limit).map(function (row) {
     return compactRow_(row, ["document_id", "document_name", "category", "owner_person_id", "expiry_date", "days_to_expiry", "renewal_required", "status", "remarks"]);
+  });
+}
+
+function queryHouseholdMemory_(payload) {
+  const safe = copyObject_(payload);
+  assertAllowedKeys_(safe, [
+    "limit", "memory_type", "category", "status", "owner_person_id",
+    "related_person_id", "subject", "location", "query_text",
+  ], "query_household_memory");
+  const subjectText = normalizeMemorySearchText_(safe.subject || "");
+  const locationText = normalizeMemorySearchText_(safe.location || "");
+  const queryText = normalizeMemorySearchText_(safe.query_text || safe.subject || "");
+  const effectiveStatus = safe.status === undefined || safe.status === null || safe.status === ""
+    ? "active"
+    : String(safe.status);
+
+  let rows = rowsWithId_("household_memory", "memory_id").filter(function (row) {
+    if (!exactFiltersMatch_(row, {
+      memory_type: safe.memory_type,
+      category: safe.category,
+      status: effectiveStatus,
+      owner_person_id: safe.owner_person_id,
+      related_person_id: safe.related_person_id,
+    }, ["memory_type", "category", "status", "owner_person_id", "related_person_id"])) {
+      return false;
+    }
+    if (subjectText && !memoryFieldMatches_(row.subject, subjectText)) return false;
+    if (locationText && !memoryFieldMatches_(row.location, locationText)) return false;
+    if (queryText && scoreHouseholdMemoryQuery_(row, queryText) <= 0) return false;
+    return true;
+  });
+
+  if (queryText) {
+    rows = rows
+      .map(function (row) {
+        return { row: row, score: scoreHouseholdMemoryQuery_(row, queryText) };
+      })
+      .sort(function (left, right) {
+        if (right.score !== left.score) return right.score - left.score;
+        return String(right.row.updated_at || "").localeCompare(String(left.row.updated_at || ""));
+      })
+      .map(function (entry) { return entry.row; });
+  } else {
+    rows = rows.reverse();
+  }
+
+  return limitRows_(rows, safe.limit).map(function (row) {
+    return compactRow_(row, [
+      "memory_id", "memory_type", "subject", "value_text", "location", "category",
+      "status", "owner_person_id", "related_person_id", "tags", "aliases",
+      "last_verified_at", "confidence", "updated_at", "remarks",
+    ]);
   });
 }
 
@@ -1243,6 +1308,33 @@ function updateDocument_(payload, request) {
   ], normalizeDocumentPatch_, assertDocumentReferences_, request);
 }
 
+function appendHouseholdMemory_(payload, request) {
+  assertAllowedKeys_(payload, [
+    "memory_type", "subject", "value_text", "location", "category", "status",
+    "owner_person_id", "related_person_id", "tags", "aliases", "last_verified_at",
+    "confidence", "remarks",
+  ], "append_household_memory");
+  const now = now_();
+  const record = normalizeHouseholdMemoryPatch_(payload);
+  record.memory_id = makeId_("mem");
+  record.household_id = FAMILY_OS.householdId;
+  record.memory_type = record.memory_type || "item_location";
+  record.subject = requireString_(record.subject, "subject");
+  record.status = record.status || "active";
+  record.confidence = record.confidence || "confirmed";
+  if (!record.value_text && record.location && record.memory_type === "item_location") {
+    record.value_text = "放咗喺" + record.location;
+  }
+  if (!record.last_verified_at && record.status === "active") {
+    record.last_verified_at = now;
+  }
+  assertHouseholdMemoryReferences_(record);
+  addCreateMetadata_(record, now);
+  appendRecord_("household_memory", record);
+  appendAudit_("household_memory", record.memory_id, "append", {}, record, request);
+  return compactRow_(record, WRITE_COLUMNS.household_memory);
+}
+
 function appendAudit_(sheetName, recordId, operation, before, after, request) {
   const now = now_();
   appendRecord_("audit_log", {
@@ -1499,6 +1591,21 @@ function normalizeDocumentPatch_(payload) {
   return record;
 }
 
+function normalizeHouseholdMemoryPatch_(payload) {
+  const record = copyObject_(payload);
+  if (hasOwn_(record, "memory_type")) record.memory_type = requireOneOf_(record.memory_type, HOUSEHOLD_MEMORY_TYPES, "memory_type");
+  if (hasOwn_(record, "subject")) record.subject = requireString_(record.subject, "subject");
+  if (hasOwn_(record, "value_text")) record.value_text = optionalString_(record.value_text);
+  if (hasOwn_(record, "location")) record.location = optionalString_(record.location);
+  if (hasOwn_(record, "category")) record.category = optionalString_(record.category);
+  if (hasOwn_(record, "status")) record.status = requireOneOf_(record.status, HOUSEHOLD_MEMORY_STATUSES, "status");
+  if (hasOwn_(record, "tags")) record.tags = normalizeStringListField_(record.tags);
+  if (hasOwn_(record, "aliases")) record.aliases = normalizeStringListField_(record.aliases);
+  if (hasOwn_(record, "last_verified_at")) record.last_verified_at = optionalTimestamp_(record.last_verified_at);
+  if (hasOwn_(record, "confidence")) record.confidence = requireOneOf_(record.confidence, HOUSEHOLD_MEMORY_CONFIDENCE, "confidence");
+  return record;
+}
+
 function assertTaskReferences_(record) {
   assertOptionalRecordExists_("people", "person_id", record.owner_person_id);
   assertOptionalRecordExists_("people", "person_id", record.related_person_id);
@@ -1513,6 +1620,11 @@ function assertCaregiverRecordReferences_(record) {
 function assertDocumentReferences_(record) {
   assertOptionalRecordExists_("people", "person_id", record.owner_person_id);
   assertOptionalRecordExists_("tasks", "task_id", record.related_task_id);
+}
+
+function assertHouseholdMemoryReferences_(record) {
+  assertOptionalRecordExists_("people", "person_id", record.owner_person_id);
+  assertOptionalRecordExists_("people", "person_id", record.related_person_id);
 }
 
 function assertPropertyScenario_(record) {
@@ -1925,6 +2037,77 @@ function requireSlug_(value, name) {
 
 function normalizeName_(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizeMemorySearchText_(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[，,;；、]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeStringListField_(value) {
+  const values = Array.isArray(value) ? value : String(value || "").split(/[，,;；]/);
+  const seen = {};
+  const output = [];
+  values.forEach(function (entry) {
+    const text = String(entry || "").trim();
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = true;
+    output.push(text);
+  });
+  return output.join(", ");
+}
+
+function memoryFieldMatches_(value, normalizedQuery) {
+  const candidate = normalizeMemorySearchText_(value);
+  if (!candidate || !normalizedQuery) return false;
+  return candidate === normalizedQuery
+    || candidate.indexOf(normalizedQuery) !== -1
+    || normalizedQuery.indexOf(candidate) !== -1;
+}
+
+function scoreHouseholdMemoryQuery_(row, normalizedQuery) {
+  if (!normalizedQuery) return 0;
+  const fields = [
+    { text: row.subject, weight: 120 },
+    { text: row.aliases, weight: 90 },
+    { text: row.location, weight: 80 },
+    { text: row.value_text, weight: 70 },
+    { text: row.tags, weight: 60 },
+    { text: row.remarks, weight: 25 },
+  ];
+  let score = 0;
+  fields.forEach(function (field) {
+    const candidate = normalizeMemorySearchText_(field.text);
+    if (!candidate) return;
+    if (candidate === normalizedQuery) {
+      score = Math.max(score, field.weight + 50);
+      return;
+    }
+    if (candidate.indexOf(normalizedQuery) !== -1 || normalizedQuery.indexOf(candidate) !== -1) {
+      score = Math.max(score, field.weight + 20);
+      return;
+    }
+    if (tokenOverlapScore_(candidate, normalizedQuery) > 0) {
+      score = Math.max(score, field.weight);
+    }
+  });
+  return score;
+}
+
+function tokenOverlapScore_(left, right) {
+  const leftTokens = normalizeMemorySearchText_(left).split(" ").filter(Boolean);
+  const rightTokens = normalizeMemorySearchText_(right).split(" ").filter(Boolean);
+  if (!leftTokens.length || !rightTokens.length) return 0;
+  let overlap = 0;
+  leftTokens.forEach(function (token) {
+    if (rightTokens.indexOf(token) !== -1) overlap += 1;
+  });
+  return overlap;
 }
 
 function clampNumber_(value, minimum, maximum) {

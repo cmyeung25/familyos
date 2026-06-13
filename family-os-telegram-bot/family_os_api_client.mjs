@@ -170,6 +170,16 @@ class FamilyOsApiClient {
       return normalized;
     }
 
+    if (normalized.action === "append_household_memory") {
+      normalizeAppendHouseholdMemoryPayload(normalized.payload);
+      return normalized;
+    }
+
+    if (normalized.action === "query_household_memory") {
+      normalizeQueryHouseholdMemoryPayload(normalized.payload);
+      return normalized;
+    }
+
     return normalized;
   }
 
@@ -866,6 +876,162 @@ function normalizeQueryTasksPayload(payload) {
     "related_item_id",
     "from",
     "to",
+  ]);
+  for (const key of Object.keys(payload)) {
+    if (!allowedKeys.has(key)) {
+      delete payload[key];
+    }
+  }
+}
+
+function normalizeAppendHouseholdMemoryPayload(payload) {
+  if (!payload || typeof payload !== "object") return;
+
+  if (!payload.subject) {
+    payload.subject = firstNonEmptyString(
+      payload.subject,
+      payload.object_name,
+      payload.item_name,
+      payload.document_name,
+      payload.name,
+      payload.title,
+    );
+  }
+  if (!payload.location) {
+    payload.location = firstNonEmptyString(
+      payload.location,
+      payload.where,
+      payload.place,
+      payload.storage_location,
+    );
+  }
+  if (!payload.value_text) {
+    payload.value_text = firstNonEmptyString(
+      payload.value_text,
+      payload.note,
+      payload.description,
+      payload.value,
+    );
+  }
+  if (!payload.memory_type) {
+    payload.memory_type = firstNonEmptyString(
+      payload.memory_type,
+      payload.type,
+      payload.scope,
+    ) || (payload.location ? "item_location" : "fact");
+  }
+  if (!payload.owner_person_id) {
+    payload.owner_person_id = firstNonEmptyString(
+      payload.owner_person_id,
+      payload.owner,
+      payload.person_id,
+    );
+  }
+  if (!payload.related_person_id) {
+    payload.related_person_id = firstNonEmptyString(
+      payload.related_person_id,
+      payload.related_person,
+      payload.about_person_id,
+    );
+  }
+  if (!payload.last_verified_at) {
+    payload.last_verified_at = firstNonEmptyString(
+      payload.last_verified_at,
+      payload.verified_at,
+      payload.confirmed_at,
+    );
+  }
+  if (!payload.confidence) {
+    payload.confidence = firstNonEmptyString(payload.confidence, payload.certainty) || "confirmed";
+  }
+  if (!payload.status) {
+    payload.status = "active";
+  }
+  if (!payload.value_text && payload.location && payload.memory_type === "item_location") {
+    payload.value_text = `放咗喺${payload.location}`;
+  }
+  if (Array.isArray(payload.tags)) {
+    payload.tags = payload.tags.map((entry) => String(entry || "").trim()).filter(Boolean).join(", ");
+  }
+  if (Array.isArray(payload.aliases)) {
+    payload.aliases = payload.aliases.map((entry) => String(entry || "").trim()).filter(Boolean).join(", ");
+  }
+
+  const allowedKeys = new Set([
+    "memory_type",
+    "subject",
+    "value_text",
+    "location",
+    "category",
+    "status",
+    "owner_person_id",
+    "related_person_id",
+    "tags",
+    "aliases",
+    "last_verified_at",
+    "confidence",
+    "remarks",
+  ]);
+  for (const key of Object.keys(payload)) {
+    if (!allowedKeys.has(key)) {
+      delete payload[key];
+    }
+  }
+}
+
+function normalizeQueryHouseholdMemoryPayload(payload) {
+  if (!payload || typeof payload !== "object") return;
+
+  if (!payload.subject) {
+    payload.subject = firstNonEmptyString(
+      payload.subject,
+      payload.object_name,
+      payload.item_name,
+      payload.name,
+      payload.title,
+    );
+  }
+  if (!payload.location) {
+    payload.location = firstNonEmptyString(
+      payload.location,
+      payload.where,
+      payload.place,
+      payload.storage_location,
+    );
+  }
+  if (!payload.query_text) {
+    payload.query_text = firstNonEmptyString(
+      payload.query_text,
+      payload.query,
+      payload.text,
+      payload.keyword,
+      payload.subject,
+    );
+  }
+  if (!payload.memory_type) {
+    payload.memory_type = firstNonEmptyString(
+      payload.memory_type,
+      payload.type,
+      payload.scope,
+    );
+  }
+  if (!payload.status) {
+    payload.status = "active";
+  }
+  if (!payload.limit && (payload.query_text || payload.subject || payload.location)) {
+    payload.limit = 10;
+  }
+
+  const allowedKeys = new Set([
+    "limit",
+    "memory_type",
+    "category",
+    "status",
+    "owner_person_id",
+    "related_person_id",
+    "subject",
+    "location",
+    "query_text",
   ]);
   for (const key of Object.keys(payload)) {
     if (!allowedKeys.has(key)) {
@@ -1747,6 +1913,40 @@ export async function runFamilyOsApiClientSelfTest() {
   });
   if (createAaaMatch.type !== "none") {
     throw new Error("Inventory similarity self-test failed: AAA電芯 should not silently reuse AA電芯 during new-item bootstrap.");
+  }
+  const appendMemoryPayload = {
+    object_name: "成長椅工具",
+    where: "工具箱",
+    note: "組裝用六角匙",
+    type: "item_location",
+    tags: ["成長椅", "工具"],
+  };
+  normalizeAppendHouseholdMemoryPayload(appendMemoryPayload);
+  if (
+    appendMemoryPayload.subject !== "成長椅工具"
+    || appendMemoryPayload.location !== "工具箱"
+    || appendMemoryPayload.value_text !== "組裝用六角匙"
+    || appendMemoryPayload.memory_type !== "item_location"
+    || appendMemoryPayload.tags !== "成長椅, 工具"
+    || appendMemoryPayload.status !== "active"
+    || appendMemoryPayload.confidence !== "confirmed"
+  ) {
+    throw new Error("Append-household-memory payload normalization failed.");
+  }
+  const queryMemoryPayload = {
+    query: "成長椅套工具",
+    type: "item_location",
+    ignored_field: "x",
+  };
+  normalizeQueryHouseholdMemoryPayload(queryMemoryPayload);
+  if (
+    queryMemoryPayload.query_text !== "成長椅套工具"
+    || queryMemoryPayload.memory_type !== "item_location"
+    || queryMemoryPayload.status !== "active"
+    || queryMemoryPayload.limit !== 10
+    || "ignored_field" in queryMemoryPayload
+  ) {
+    throw new Error("Query-household-memory payload normalization failed.");
   }
   const singleCandidatePrompt = buildInventoryAmbiguityMessage("乳酪", [{ item_name: "乳酪" }]);
   if (!singleCandidatePrompt.includes("乳酪")) {

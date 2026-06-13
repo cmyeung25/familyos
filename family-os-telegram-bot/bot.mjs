@@ -482,8 +482,8 @@ function formatBridgeHealthPlain(health) {
 
 function helpText() {
   const summary = persona.supportsBabyLogs
-    ? "Family OS BB + 庫存 + 輕量 task。"
-    : "Family OS 屋企存貨 + 提醒任務。";
+    ? "Family OS BB + 屋企備忘 + 庫存 + 輕量 task。"
+    : "Family OS 屋企存貨 + 物件擺位 + 提醒任務。";
   const examples = persona.supportsBabyLogs
     ? [
         "- BB 飲奶 90 ml",
@@ -491,11 +491,15 @@ function helpText() {
         "- BB 瞓覺",
         "- 公仔麵而家得返 4 包",
         "- 買咗 10 隻蛋",
+        "- 幫我記住成長椅工具放咗喺工具箱",
+        "- 成長椅工具放咗去邊？",
       ]
     : [
         "- 屋企而家有咩要補貨？",
         "- 公仔麵而家得返 4 包",
         "- 買咗 10 隻蛋",
+        "- 幫我記住成長椅工具放咗喺工具箱",
+        "- 成長椅工具放咗去邊？",
         "- 提我聽日買洗潔精",
         "- 未來幾日有咩 task 要做？",
       ];
