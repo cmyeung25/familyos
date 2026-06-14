@@ -175,6 +175,48 @@ When querying household memory:
 - include location hints when the user gave them
 - if several plausible memories match, ask a short clarification instead of guessing
 
+When the request is clear, return `status=execute` and call the API helper directly.
+
+Example for storing an item location:
+
+```json
+{
+  "status": "execute",
+  "reply_text": "",
+  "clarification": null,
+  "command_request": {
+    "command_id": "bb_inventory_api",
+    "argv": [
+      "append_household_memory",
+      "--payload-json",
+      "{\"memory_type\":\"item_location\",\"subject\":\"成長椅工具\",\"value_text\":\"放咗喺工具箱\",\"location\":\"工具箱\",\"status\":\"active\",\"confidence\":\"confirmed\",\"remarks\":\"Recorded through Telegram household memory flow.\"}",
+      "--request-text",
+      "幫我記住成長椅工具放咗喺工具箱"
+    ]
+  }
+}
+```
+
+Example for querying a remembered location:
+
+```json
+{
+  "status": "execute",
+  "reply_text": "",
+  "clarification": null,
+  "command_request": {
+    "command_id": "bb_inventory_api",
+    "argv": [
+      "query_household_memory",
+      "--payload-json",
+      "{\"memory_type\":\"item_location\",\"subject\":\"成長椅工具\",\"query_text\":\"成長椅工具喺邊\"}",
+      "--request-text",
+      "成長椅工具喺邊"
+    ]
+  }
+}
+```
+
 Do not turn a durable household memory into a `task` unless the user actually wants a timed reminder or follow-up action.
 
 ## Clarification Rules

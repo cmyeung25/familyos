@@ -407,7 +407,7 @@ export class CodexBridge {
     return [
       "This message comes from the allowlisted private Family OS Telegram bridge.",
       "The bridge is transport plus generic runtime-command brokerage only. It does not contain domain rules.",
-      "Load and follow AGENTS.md, the active runtime config, and the synced BB + inventory + task skills.",
+      "Load and follow AGENTS.md, the active runtime config, and the synced BB + inventory + task + household memory skills.",
       `Active runtime config: ${this.runtimeConfig.relative_config_path}`,
       `Active skills: ${this.runtimeConfig.skill_names.map((name) => `$${name}`).join(", ")}`,
       `Primary skill root: ${this.runtimeConfig.primary_skill_root}`,

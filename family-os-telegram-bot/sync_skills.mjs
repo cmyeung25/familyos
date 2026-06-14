@@ -21,7 +21,7 @@ for (const skillName of skillNames) {
   copyDirectory(source, target);
 }
 
-console.log(`Synced ${skillNames.length} BB + inventory + task V2 skills from ${runtimeConfigPath} to ${targetRoot}`);
+console.log(`Synced ${skillNames.length} BB + inventory + task + household memory V2 skills from ${runtimeConfigPath} to ${targetRoot}`);
 
 function copyDirectory(source, target) {
   fs.mkdirSync(target, { recursive: true });

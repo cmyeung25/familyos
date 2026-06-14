@@ -1,9 +1,9 @@
 ---
 name: family-os-bb-inventory-api
-description: Use the narrow Family OS local API wrapper for BB logs, inventory, and lightweight tasks. This skill is the only live data execution path for the Telegram V2 runtime.
+description: Use the narrow Family OS local API wrapper for BB logs, inventory, lightweight tasks, and household memory. This skill is the only live data execution path for the Telegram V2 runtime.
 ---
 
-# Family OS BB + Inventory + Task API
+# Family OS BB + Inventory + Task + Household Memory API
 
 Use this skill only with `$family-os-bb-inventory`.
 
@@ -24,6 +24,8 @@ Use this skill only with `$family-os-bb-inventory`.
 - `query_tasks`
 - `get_upcoming_tasks`
 - `get_overdue_tasks`
+- `append_household_memory`
+- `query_household_memory`
 
 Do not use any other Family OS API action from this Telegram runtime.
 
@@ -240,6 +242,50 @@ Example:
       "{\"status\":\"open\",\"from\":\"2026-06-09 00:00:00+08:00\",\"to\":\"2026-06-09 23:59:59+08:00\"}",
       "--request-text",
       "幫我睇 6月9號 嗰日有咩 task"
+    ]
+  }
+}
+```
+
+### Append household memory
+
+Use this when the user wants the bot to remember a durable item location, household fact, or household preference.
+
+```json
+{
+  "status": "execute",
+  "reply_text": "",
+  "clarification": null,
+  "command_request": {
+    "command_id": "bb_inventory_api",
+    "argv": [
+      "append_household_memory",
+      "--payload-json",
+      "{\"memory_type\":\"item_location\",\"subject\":\"成長椅工具\",\"value_text\":\"放咗喺工具箱\",\"location\":\"工具箱\",\"status\":\"active\",\"confidence\":\"confirmed\",\"remarks\":\"Recorded through Telegram household memory flow.\"}",
+      "--request-text",
+      "幫我記住成長椅工具放咗喺工具箱"
+    ]
+  }
+}
+```
+
+### Query household memory
+
+Use this when the user asks where an item is stored or asks for a previously recorded household fact or preference.
+
+```json
+{
+  "status": "execute",
+  "reply_text": "",
+  "clarification": null,
+  "command_request": {
+    "command_id": "bb_inventory_api",
+    "argv": [
+      "query_household_memory",
+      "--payload-json",
+      "{\"memory_type\":\"item_location\",\"subject\":\"成長椅工具\",\"query_text\":\"成長椅工具喺邊\",\"limit\":10}",
+      "--request-text",
+      "成長椅工具喺邊"
     ]
   }
 }
