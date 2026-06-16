@@ -1,5 +1,5 @@
 const FAMILY_OS = Object.freeze({
-  spreadsheetId: "1kyKGz6GuScz3GblIVTq12-L6LqzxAQpBmGZB74nifpc",
+  spreadsheetId: PropertiesService.getScriptProperties().getProperty("FAMILY_SHEET_ID"),
   householdId: "hh_home",
   schemaVersion: "family_os_poc_v1",
   timezone: "Asia/Hong_Kong",
