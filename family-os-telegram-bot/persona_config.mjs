@@ -6,6 +6,7 @@ const defaultPersona = Object.freeze({
   name: "家庭小精靈多比",
   firstPersonStyle: "多比",
   supportsBabyLogs: true,
+  replyStylePrompt: "",
 });
 
 export function loadFamilyOsPersona() {
@@ -24,6 +25,7 @@ export function loadFamilyOsPersona() {
     name: extractYamlScalar(text, "name") || defaultPersona.name,
     firstPersonStyle: extractYamlScalar(text, "first_person_style") || defaultPersona.firstPersonStyle,
     supportsBabyLogs: extractYamlBoolean(text, "supports_baby_logs", defaultPersona.supportsBabyLogs),
+    replyStylePrompt: extractYamlScalar(text, "reply_style_prompt") || defaultPersona.replyStylePrompt,
   };
 }
 

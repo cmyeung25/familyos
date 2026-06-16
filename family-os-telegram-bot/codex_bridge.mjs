@@ -372,7 +372,18 @@ export class CodexBridge {
       "Allowed runtime commands:",
       bridgeCommands,
       "Use status=reply, status=clarify, or status=desktop_required only when you are ready for a user-facing answer.",
+      `Persona name: ${this.persona.name}.`,
       `Use Cantonese and a humble household-helper tone in reply_text only. When speaking in first person, use "${this.persona.firstPersonStyle}".`,
+      "Keep the voice warm, lively, and clearly in-character, but never sacrifice correctness or clarity.",
+      "Prefer natural in-character phrasing such as helping, noticing, remembering, or reminding, instead of flat factual narration.",
+      "Do not answer a normal successful household query with only one bare factual sentence unless the user explicitly asked for ultra-brief output.",
+      `In a normal successful reply, include "${this.persona.firstPersonStyle}" at least once unless the user explicitly asked for no persona wording.`,
+      `For routine successful replies, prefer phrasing patterns like "${this.persona.firstPersonStyle}幫你睇到，..." or "${this.persona.firstPersonStyle}已經幫你記低咗..." when they fit the action.`,
+      "When it feels natural, add a gentle Cantonese ending particle such as 呀, 喇, or 㗎, but keep it light and not exaggerated.",
+      "Good style example for a read answer: 多比幫你睇到，下次產檢係 6 月 23 號下午 3 點半呀。",
+      "Good style example for a write answer: 多比已經幫你記低咗用咗 1 卷廁紙呀，現時仲剩返 13 卷。",
+      "Do not overdo catchphrases. Keep replies concise, but let the persona feel recognizably present in the wording.",
+      ...(this.persona.replyStylePrompt ? [`Persona-specific reply style: ${this.persona.replyStylePrompt}`] : []),
       `Telegram user ID: ${telegramUserId || ""}`,
       ...(senderIdentityBlock ? ["", senderIdentityBlock] : []),
       "",
@@ -459,12 +470,12 @@ export class CodexBridge {
         question,
         allow_free_text: envelope.clarification?.allow_free_text !== false,
         original_user_text: sourceUserText,
-        last_reply_text: envelope.reply_text || question,
+        last_reply_text: applyPersonaReplyStyle(envelope.reply_text || question, { mode: "clarify" }),
         created_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + pendingClarificationTtlMs).toISOString(),
       });
       return {
-        text: question,
+        text: applyPersonaReplyStyle(question, { mode: "clarify" }),
         reply_markup: pendingChoices.length > 0 ? buildInlineKeyboard(pendingChoices) : null,
       };
     }
@@ -472,7 +483,7 @@ export class CodexBridge {
     chatState.pending_choices = [];
     chatState.pending_clarification = null;
     return {
-      text: envelope.reply_text,
+      text: applyPersonaReplyStyle(envelope.reply_text, { mode: envelope.status === "desktop_required" ? "desktop_required" : "reply" }),
       reply_markup: null,
     };
   }
@@ -1453,6 +1464,37 @@ function normalizeCommandRequest(value) {
       ? source.argv.map((entry) => String(entry || ""))
       : [],
   };
+}
+
+function applyPersonaReplyStyle(text, { mode = "reply" } = {}) {
+  const raw = String(text || "").trim();
+  if (!raw) return raw;
+  if (raw.includes(persona.firstPersonStyle)) {
+    return raw;
+  }
+
+  if (mode === "clarify") {
+    return `${persona.firstPersonStyle}想問清楚少少，${raw}`;
+  }
+  if (mode === "desktop_required") {
+    return `${persona.firstPersonStyle}想同你講，${raw}`;
+  }
+
+  if (/\n/u.test(raw)) {
+    return `${pickPersonaPrefix(raw)}：\n${raw}`;
+  }
+  return `${pickPersonaPrefix(raw)}，${raw}`;
+}
+
+function pickPersonaPrefix(text) {
+  const normalized = String(text || "");
+  if (/已經|記低|處理好|幫你提|剩返|完成/u.test(normalized)) {
+    return `${persona.firstPersonStyle}已經幫你處理好喇`;
+  }
+  if (/提醒|提你|到鐘|due|task/u.test(normalized)) {
+    return `${persona.firstPersonStyle}提提你`;
+  }
+  return `${persona.firstPersonStyle}幫你睇到`;
 }
 
 function runNodeRuntimeCommand(workspace, scriptPath, argv, timeoutMs, nodeArgs = []) {
