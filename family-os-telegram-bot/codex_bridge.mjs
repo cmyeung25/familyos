@@ -1,11 +1,10 @@
 import fs from "node:fs";
-import { execFileSync, spawnSync } from "node:child_process";
-import os from "node:os";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { Codex } from "@openai/codex-sdk";
 import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
+import { buildLlmRunOptions, createLlmProvider } from "./llm_provider.mjs";
 import { loadFamilyOsPersona } from "./persona_config.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -17,16 +16,6 @@ const defaultStatePath = runtimePaths.bridgeStatePath;
 const bridgeErrorLogPath = runtimePaths.bridgeErrorLogPath;
 const defaultRuntimeConfigPath = runtimePaths.runtimeConfigPath;
 const defaultReminderConfigPath = runtimePaths.reminderConfigPath;
-const bundledCodexPath = path.join(
-  scriptDir,
-  "node_modules",
-  "@openai",
-  "codex-win32-x64",
-  "vendor",
-  "x86_64-pc-windows-msvc",
-  "bin",
-  "codex.exe",
-);
 const callbackChoiceTtlMs = 30 * 60 * 1000;
 const pendingClarificationTtlMs = 30 * 60 * 1000;
 const maxBridgeExecutionSteps = 6;
@@ -103,7 +92,7 @@ export class CodexBridge {
     this.reminderConfigPath = path.resolve(reminderConfigPath);
     this.skillsRoot = path.resolve(process.env.FAMILY_OS_SKILLS_ROOT || path.join(this.workspace, ".agents", "skills"));
     this.timeoutMs = timeoutMs;
-    this.codex = new Codex();
+    this.llmProvider = createLlmProvider({ workspace: this.workspace });
     this.runtimeConfig = readRuntimeConfig(this.runtimeConfigPath);
     this.reminderRecipientMap = readReminderRecipientMap(this.reminderConfigPath);
     this.persona = persona;
@@ -125,13 +114,11 @@ export class CodexBridge {
   }
 
   health({ requireLogin = true } = {}) {
-    const login = readCodexLoginStatus();
-    const codexHome = process.env.CODEX_HOME
-      ? path.resolve(process.env.CODEX_HOME)
-      : path.join(os.homedir(), ".codex");
+    const providerHealth = this.llmProvider.health({ requireLogin });
     const checks = {
-      codex_login: login.message,
-      desktop_auth_cache: fs.existsSync(path.join(codexHome, "auth.json")),
+      llm_provider: providerHealth.provider,
+      llm_auth: providerHealth.message,
+      ...providerHealth.checks,
       workspace: fs.existsSync(this.workspace),
       agents_md: fs.existsSync(path.join(this.workspace, "AGENTS.md")),
       runtime_config: fs.existsSync(this.runtimeConfigPath),
@@ -149,7 +136,7 @@ export class CodexBridge {
         fs.existsSync(commandDef.absolutePath),
       ])),
     };
-    const ok = (!requireLogin || login.ok)
+    const ok = providerHealth.ok
       && checks.workspace
       && checks.agents_md
       && checks.runtime_config
@@ -160,7 +147,9 @@ export class CodexBridge {
     return {
       ok,
       workspace: this.workspace,
-      auth_mode: "codex_login",
+      provider: providerHealth.provider,
+      auth_mode: providerHealth.authMode,
+      model: this.threadOptions().model,
       runtime_config_path: this.runtimeConfig.relative_config_path,
       checks,
     };
@@ -174,7 +163,7 @@ export class CodexBridge {
   async run(chatId, userText, { telegramUserId = "" } = {}) {
     const health = this.health();
     if (!health.ok) {
-      throw new Error("Codex Bridge is not ready. Sign in to Codex in this Windows session and sync the BB + inventory + task V2 skills.");
+      throw new Error(this.llmProvider.notReadyMessage());
     }
     const stateKey = String(chatId);
     const chatState = this.getChatState(stateKey, true);
@@ -239,14 +228,16 @@ export class CodexBridge {
       chatState.pending_choices = [];
       chatState.pending_clarification = null;
     }
-    const thread = chatState.thread_id
-      ? this.codex.resumeThread(chatState.thread_id, this.threadOptions())
-      : this.codex.startThread(this.threadOptions());
+    const session = this.llmProvider.openSession({
+      sessionId: chatState.thread_id,
+    });
 
     try {
-      const envelope = await this.runBridgeTurnLoop(thread, userText, telegramUserId, chatState, resumeContext);
-      if (thread.id) {
-        chatState.thread_id = thread.id;
+      const envelope = await this.runBridgeTurnLoop(session, userText, telegramUserId, chatState, resumeContext);
+      if (this.llmProvider.usesPersistentSessions()) {
+        chatState.thread_id = this.llmProvider.getSessionId(session);
+      } else {
+        chatState.thread_id = "";
       }
       applySuccessfulTurnContext(chatState, envelope, userText);
       const reply = this.buildBridgeReply(chatState, envelope, { sourceUserText: userText });
@@ -256,7 +247,12 @@ export class CodexBridge {
       this.saveState();
       return reply;
     } catch (error) {
-      if (!retrying && chatState.thread_id && shouldRetryWithFreshThread(error)) {
+      if (
+        !retrying
+        && this.llmProvider.usesPersistentSessions()
+        && chatState.thread_id
+        && shouldRetryWithFreshThread(error)
+      ) {
         chatState.thread_id = "";
         chatState.pending_choices = [];
         chatState.pending_clarification = null;
@@ -277,7 +273,7 @@ export class CodexBridge {
     }
   }
 
-  async runBridgeTurnLoop(thread, userText, telegramUserId, chatState, resumeContext = null) {
+  async runBridgeTurnLoop(session, userText, telegramUserId, chatState, resumeContext = null) {
     let prompt = this.buildFamilyOsAgentPrompt(userText, telegramUserId, chatState, resumeContext);
     let latestSuccessfulExecution = null;
     const successfulExecutions = [];
@@ -285,7 +281,7 @@ export class CodexBridge {
 
     for (let step = 0; step < maxBridgeExecutionSteps; step += 1) {
       const response = await this.runStructuredTurnWithTimeout(
-        thread,
+        session,
         prompt,
         bridgeEnvelopeSchema(this.runtimeConfig),
       );
@@ -326,71 +322,26 @@ export class CodexBridge {
     });
   }
 
-  async runStructuredTurnWithTimeout(thread, prompt, outputSchema) {
+  async runStructuredTurnWithTimeout(session, prompt, outputSchema) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    const itemsById = new Map();
-    let finalResponse = "";
-    let usage = null;
 
     try {
-      const { events } = await thread.runStreamed(prompt, {
+      return await this.llmProvider.runStructuredTurn(session, prompt, {
         signal: controller.signal,
         outputSchema,
-      });
-
-      for await (const event of events) {
-        if (event.type === "turn.failed") {
-          throw new Error(event.error?.message || "Codex bridge structured turn failed.");
-        }
-        if (event.type === "error") {
-          throw new Error(event.message || "Codex bridge structured stream failed.");
-        }
-        if (event.type === "turn.completed") {
-          usage = event.usage || null;
-          continue;
-        }
-        if (!("item" in event) || !event.item) {
-          continue;
-        }
-
-        const item = event.item;
-        itemsById.set(item.id, item);
-
-        const boundary = validateBridgeTurnItem(item, {
+        validateItem: (item) => validateBridgeTurnItem(item, {
           runtimeKnowledgeRoot: this.runtimeKnowledgeRoot,
           workspace: this.workspace,
-        });
-        if (!boundary.ok) {
-          controller.abort();
-          throw new Error(boundary.error);
-        }
-        if (item.type === "agent_message" && typeof item.text === "string") {
-          finalResponse = item.text;
-        }
-      }
-
-      return {
-        finalResponse,
-        usage,
-        items: Array.from(itemsById.values()),
-      };
+        }),
+      });
     } finally {
       clearTimeout(timeout);
     }
   }
 
   threadOptions() {
-    return {
-      model: "gpt-5.4",
-      workingDirectory: this.workspace,
-      skipGitRepoCheck: true,
-      sandboxMode: "workspace-write",
-      approvalPolicy: "never",
-      networkAccessEnabled: true,
-      webSearchMode: "disabled",
-      modelReasoningEffort: "medium",
-    };
+    return buildLlmRunOptions(this.workspace);
   }
 
   buildFamilyOsAgentPrompt(userText, telegramUserId, chatState, resumeContext = null) {
@@ -1595,41 +1546,6 @@ function appendBridgeErrorLog(error, context = {}) {
   }
 }
 
-function readCodexLoginStatus() {
-  const localCodexHome = process.env.CODEX_HOME
-    ? path.resolve(process.env.CODEX_HOME)
-    : path.join(os.homedir(), ".codex");
-  for (const codexCommand of [bundledCodexPath, "codex"]) {
-    try {
-      const output = execFileSync(codexCommand, ["login", "status"], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          CODEX_HOME: localCodexHome,
-        },
-      }).trim();
-
-      if (/not logged in/i.test(output)) {
-        return { ok: false, message: output || "Not logged in" };
-      }
-      return { ok: true, message: output || "Logged in" };
-    } catch (error) {
-      if (error?.code === "ENOENT") {
-        continue;
-      }
-      const output = `${error.stdout || ""}${error.stderr || ""}`.trim();
-      if (/not logged in/i.test(output) || /not logged in/i.test(String(error.message || ""))) {
-        return { ok: false, message: output || "Not logged in" };
-      }
-      if (output || error.message) {
-        return { ok: false, message: output || String(error.message) };
-      }
-    }
-  }
-  return { ok: false, message: "Codex login status could not be determined." };
-}
-
 const isMainModule = path.resolve(process.argv[1] || "") === fileURLToPath(import.meta.url);
 
 if (isMainModule && process.argv.includes("--self-test")) {
@@ -1649,7 +1565,7 @@ if (isMainModule && process.argv.includes("--self-test")) {
   if (!Object.values(health.checks.references).every(Boolean)) {
     throw new Error("Bridge health failed: one or more runtime reference files are missing.");
   }
-  if (options.model !== "gpt-5.4" || options.modelReasoningEffort !== "medium") {
+  if (!["codex", "deepseek"].includes(options.provider) || !options.model || options.modelReasoningEffort !== "medium") {
     throw new Error("Bridge self-test failed: thread model options are invalid.");
   }
   if (options.networkAccessEnabled !== true || options.approvalPolicy !== "never") {
@@ -1998,5 +1914,5 @@ if (isMainModule && process.argv.includes("--self-test")) {
     throw new Error("Bridge self-test failed: MCP usage was not rejected.");
   }
 
-  console.log("Family OS Codex Bridge self-test passed.");
+  console.log(`Family OS Bridge self-test passed (${options.provider}).`);
 }

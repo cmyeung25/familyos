@@ -5,7 +5,8 @@
 ```text
 Telegram private chat
   -> local long-polling bot
-  -> local Codex SDK bridge with one persistent Codex thread per chat
+  -> local LLM bridge
+       -> Codex SDK thread mode or DeepSeek API mode
        -> allowlist + callback transport
        -> generic runtime-command brokerage for plugin-owned helpers
        -> BB + inventory + task V2 skills inside the workspace
@@ -13,10 +14,10 @@ Telegram private chat
   -> Family OS Apps Script API
 ```
 
-Telegram is a local Codex entrypoint. The bridge stays thin in domain terms: it
+Telegram is a local Family OS entrypoint. The bridge stays thin in domain terms: it
 handles Telegram ingress, allowlisting, per-chat thread resume, callback
 transport, and execution of plugin-configured helper commands, while the BB +
-inventory reasoning stays inside the Codex thread and skill runtime.
+inventory reasoning stays inside the active LLM turn and skill runtime.
 
 Keep this boundary strict:
 
@@ -67,10 +68,12 @@ powershell -ExecutionPolicy Bypass -File .\family-os-telegram-bot\configure-loca
 The script checks the standalone Family OS API configuration, stores local
 secrets in Windows DPAPI-encrypted files, and validates Bot startup. Do not paste
 secrets into chat, Git, or Google Sheets. Natural-language understanding uses the
-local Codex login. `OPENAI_API_KEY` is not used.
+local Codex login by default. Alternatively, set `FAMILY_OS_LLM_PROVIDER=deepseek`
+and provide `DEEPSEEK_API_KEY`. `OPENAI_API_KEY` is not used.
 
-If `codex login status` says `Not logged in`, run `codex login --device-auth`
-in the same Windows user session and sign in with ChatGPT before starting the bot.
+If you stay on Codex mode and `codex login status` says `Not logged in`, run
+`codex login --device-auth` in the same Windows user session and sign in with
+ChatGPT before starting the bot.
 
 For Telegram-token-only retries, run:
 
@@ -112,7 +115,7 @@ family-os-telegram-bot/bot-runtime.out.log
 family-os-telegram-bot/bot-runtime.err.log
 ```
 
-After startup, send `/bridgehealth`. Use `/reset` when you want to clear the Codex context for the current Telegram chat.
+After startup, send `/bridgehealth`. Use `/reset` when you want to clear the current Telegram chat state.
 
 Send BB or inventory questions as normal Cantonese messages, for example:
 

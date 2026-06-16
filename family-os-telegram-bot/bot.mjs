@@ -24,6 +24,7 @@ fs.appendFileSync(startupDebugLogPath, `${JSON.stringify({
   has_allowed_users: Boolean(process.env.TELEGRAM_ALLOWED_USER_IDS),
   has_api_url: Boolean(process.env.FAMILY_OS_API_URL),
   has_api_key: Boolean(process.env.FAMILY_OS_API_KEY),
+  llm_provider: process.env.FAMILY_OS_LLM_PROVIDER || "codex",
   codex_home: process.env.CODEX_HOME || "",
 })}\n`, "utf8");
 
@@ -85,7 +86,7 @@ try {
 }
 console.log(`Allowed Telegram user IDs: ${[...config.allowedUserIds].join(", ") || "(none; only /whoami is available)"}`);
 console.log(`Allowlist source: ${config.allowlistSource}`);
-console.log(`Codex Bridge ready: ${bridge.health().ok}`);
+console.log(`Family OS Bridge ready: ${bridge.health().ok}`);
 logActivity("bot_started", { bridge_ready: bridge.health().ok });
 writeHeartbeat("started", { bridge_ready: bridge.health().ok });
 setInterval(() => writeHeartbeat("idle"), 60000).unref();
@@ -471,9 +472,11 @@ async function fetchJson(url, options) {
 
 function formatBridgeHealthPlain(health) {
   return [
-    `Codex Bridge: ${health.ok ? "ok" : "not ready"}`,
+    `Family OS Bridge: ${health.ok ? "ok" : "not ready"}`,
+    `Provider: ${health.provider || "unknown"}`,
+    `Model: ${health.model || "unknown"}`,
     `Auth mode: ${health.auth_mode || "unknown"}`,
-    `Codex login: ${health.checks.codex_login || "unknown"}`,
+    `LLM auth: ${health.checks.llm_auth || "unknown"}`,
     `AGENTS.md: ${health.checks.agents_md ? "present" : "missing"}`,
     `Runtime knowledge root: ${health.checks.runtime_knowledge_root ? "present" : "missing"}`,
     ...Object.entries(health.checks.skills).map(([name, ok]) => `${name}: ${ok ? "present" : "missing"}`),

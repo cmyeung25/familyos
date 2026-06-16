@@ -1,10 +1,10 @@
 # Family OS
 
-Family OS is a household assistant workspace built around a Telegram bot, a Codex bridge, and a Google Apps Script API backed by Google Sheets.
+Family OS is a household assistant workspace built around a Telegram bot, an LLM bridge, and a Google Apps Script API backed by Google Sheets.
 
 ## Current layout
 
-- `family-os-telegram-bot/`: Telegram bot runtime, Codex bridge, reminder worker
+- `family-os-telegram-bot/`: Telegram bot runtime, LLM bridge, reminder worker
 - `family-os-apps-script/`: Apps Script Web App backend for audited reads and writes
 - `plugins-staging/`: staged skills and runtime references used by the Telegram BB + inventory flow
 - `instances/example/`: Phase 1 multi-instance config scaffold
@@ -35,6 +35,7 @@ The container runtime is Linux-compatible and does not depend on PowerShell or W
 - `FAMILY_OS_API_KEY`
 - a mounted instance folder under `/data/instance`
 - a mounted Codex auth cache under `/data/instance/.codex-home` if you keep using Codex login
+- or `FAMILY_OS_LLM_PROVIDER=deepseek` plus `DEEPSEEK_API_KEY` if you switch to DeepSeek API mode
 - optional extra CA certs under `/data/instance/secrets/certs/*.crt` when the host network path uses TLS interception or a private trust root
 
 ## Phase 3 preview
@@ -61,6 +62,14 @@ The bot now supports these path overrides:
 - `FAMILY_OS_API_CONFIG_PATH`
 - `FAMILY_OS_REMINDER_CONFIG_PATH`
 - `FAMILY_OS_RUNTIME_CONFIG_PATH`
+
+## LLM provider envs
+
+- `FAMILY_OS_LLM_PROVIDER`
+- `FAMILY_OS_LLM_MODEL`
+- `FAMILY_OS_LLM_BASE_URL`
+- `FAMILY_OS_LLM_API_KEY`
+- `DEEPSEEK_API_KEY`
 
 ## Uptime monitoring
 

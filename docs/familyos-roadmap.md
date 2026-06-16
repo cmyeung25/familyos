@@ -13,7 +13,7 @@ This document is the shared planning artifact for Family OS. It is meant to help
 Family OS is a household assistant built around:
 
 - Telegram as the daily chat surface
-- a Codex bridge for reasoning
+- an LLM bridge for reasoning
 - Google Apps Script + Google Sheets as the current operational database
 - multi-instance deployment on Synology NAS
 
@@ -54,7 +54,7 @@ The system is currently aimed at:
 
 - a structured `household_memory` capability for long-lived household facts
 - stronger skill governance and promotion flow
-- cleaner provider abstraction around LLM access
+- live provider cutover and operational playbook around LLM access
 
 ### Deferred
 
@@ -69,7 +69,7 @@ The system is currently aimed at:
 Telegram Bot (Gary) ----\
                          \--> Family OS bot container ----\
 Telegram Bot (Brother) --/                                 \
-                                                          Codex bridge
+                                                          LLM bridge
 Instance config + persona + runtime knowledge ------------/
                                                           \
                                                            --> Apps Script API --> Google Sheets
@@ -90,6 +90,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: second-family instance rollout
 - `Completed`: NAS health monitoring
 - `Planned`: cleaner update / rollback playbook for monitoring compose and per-service operations
+- `Completed`: provider abstraction groundwork for Codex vs DeepSeek selection
 
 ### Lane B: Data And API
 
