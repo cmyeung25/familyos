@@ -187,7 +187,7 @@ async function handleMessage(message) {
   } catch (error) {
     logActivity("codex_turn_failed", { user_id: userId, error: String(error.message || error) });
     writeHeartbeat("codex_turn_failed", { user_id: userId, chat_id: chatId, error: String(error.message || error) });
-    await reply(chatId, `${persona.firstPersonStyle}啱啱卡住咗：${error.message}`);
+    await reply(chatId, formatTurnErrorReply(error));
   } finally {
     activeChatTurns.delete(String(chatId));
   }
@@ -261,7 +261,7 @@ async function handleCallbackQuery(query) {
       callback_data: String(query.data || ""),
       error: String(error.message || error),
     });
-    await reply(chatId, `${persona.firstPersonStyle}啱啱卡住咗：${error.message}`);
+    await reply(chatId, formatTurnErrorReply(error));
   } finally {
     activeChatTurns.delete(String(chatId));
   }
@@ -647,6 +647,24 @@ function buildCallbackAckText(query) {
     return `${persona.firstPersonStyle}收到喇，你揀咗：${selectedLabel}`;
   }
   return `${persona.firstPersonStyle}收到你啱啱個選擇喇，我而家接住幫你處理。`;
+}
+
+function formatTurnErrorReply(error) {
+  const message = String(error?.message || error || "").trim();
+  const lower = message.toLowerCase();
+  if (lower.includes("deepseek connection dropped")) {
+    return `${persona.firstPersonStyle}啱啱同 DeepSeek 連線時斷咗一下，你而家再試一次，${persona.firstPersonStyle}再幫你處理。`;
+  }
+  if (lower.includes("deepseek request timed out")) {
+    return `${persona.firstPersonStyle}啱啱處理得太耐，今次未趕得切完成。你而家再試一次，或者分開兩句問我會穩陣啲。`;
+  }
+  if (lower.includes("deepseek service was temporarily unavailable")) {
+    return `${persona.firstPersonStyle}啱啱搵 DeepSeek 幫手時對方有啲忙，你隔一陣再試一次呀。`;
+  }
+  if (lower.includes("deepseek api is busy right now")) {
+    return `${persona.firstPersonStyle}啱啱個服務有啲塞車，你隔一陣再試一次呀。`;
+  }
+  return `${persona.firstPersonStyle}啱啱卡住咗：${message}`;
 }
 
 function findCallbackButtonLabel(query) {
