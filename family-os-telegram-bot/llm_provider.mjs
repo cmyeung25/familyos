@@ -18,6 +18,9 @@ const bundledCodexPath = path.join(
 );
 const defaultCodexModel = "gpt-5.4";
 const defaultDeepSeekModel = "deepseek-v4-flash";
+const deepSeekMaxAttempts = 3;
+const deepSeekRetryDelayMs = 1200;
+const deepSeekAttemptTimeoutMs = 45000;
 
 export function createLlmProvider({ workspace }) {
   const options = buildLlmRunOptions(workspace);
@@ -207,47 +210,73 @@ class DeepSeekProvider {
       throw new Error("This Node runtime does not provide fetch, so DeepSeek API mode is unavailable.");
     }
 
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.options.model,
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You are the Family OS Telegram bridge reasoning model.",
-              "Return exactly one JSON object and do not wrap it in markdown.",
-              "Follow this JSON schema:",
-              JSON.stringify(outputSchema),
-            ].join("\n"),
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
-      signal,
-    });
+    const payload = {
+      model: this.options.model,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You are the Family OS Telegram bridge reasoning model.",
+            "Return exactly one JSON object and do not wrap it in markdown.",
+            "Follow this JSON schema:",
+            JSON.stringify(outputSchema),
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    };
 
-    const responseText = await response.text();
-    let data = null;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      throw new Error(`DeepSeek API returned non-JSON (${response.status}).`);
-    }
+    const data = await retryDeepSeekRequest(async (attempt) => {
+      try {
+        const attemptSignal = AbortSignal.any([
+          signal,
+          AbortSignal.timeout(deepSeekAttemptTimeoutMs),
+        ]);
+        const response = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify(payload),
+          signal: attemptSignal,
+        });
 
-    if (!response.ok) {
-      const message = extractDeepSeekErrorMessage(data) || `DeepSeek API failed (${response.status}).`;
-      throw new Error(message);
-    }
+        const responseText = await response.text();
+        let parsed = null;
+        try {
+          parsed = JSON.parse(responseText);
+        } catch {
+          const parseError = new Error(`DeepSeek API returned non-JSON (${response.status}).`);
+          parseError.responseStatus = response.status;
+          throw parseError;
+        }
+
+        if (!response.ok) {
+          const message = extractDeepSeekErrorMessage(parsed) || `DeepSeek API failed (${response.status}).`;
+          const requestError = new Error(message);
+          requestError.responseStatus = response.status;
+          requestError.deepseekData = parsed;
+          requestError.attempt = attempt;
+          throw requestError;
+        }
+
+        return parsed;
+      } catch (error) {
+        if (!signal.aborted && isAttemptTimeoutError(error)) {
+          const timeoutError = new Error("DeepSeek request attempt timed out.");
+          timeoutError.code = "ATTEMPT_TIMEOUT";
+          timeoutError.attempt = attempt;
+          throw timeoutError;
+        }
+        throw error;
+      }
+    }, signal);
 
     const finalResponse = extractAssistantText(data);
     if (!finalResponse) {
@@ -261,6 +290,126 @@ class DeepSeekProvider {
     };
   }
 }
+
+async function retryDeepSeekRequest(fn, signal) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= deepSeekMaxAttempts; attempt += 1) {
+    if (signal?.aborted) {
+      throw new Error("DeepSeek request timed out before completion.");
+    }
+    try {
+      return await fn(attempt);
+    } catch (error) {
+      lastError = error;
+      if (!shouldRetryDeepSeekError(error) || attempt >= deepSeekMaxAttempts) {
+        break;
+      }
+      try {
+        await sleepWithSignal(deepSeekRetryDelayMs * attempt, signal);
+      } catch (sleepError) {
+        throw normalizeDeepSeekError(sleepError);
+      }
+    }
+  }
+  throw normalizeDeepSeekError(lastError);
+}
+
+function shouldRetryDeepSeekError(error) {
+  if (!error) return false;
+  if (error.name === "AbortError") return false;
+
+  const status = Number(error.responseStatus || 0);
+  if (status === 408 || status === 409 || status === 425 || status === 429 || status >= 500) {
+    return true;
+  }
+
+  const code = String(error.code || error.cause?.code || "").trim().toUpperCase();
+  if ([
+    "ATTEMPT_TIMEOUT",
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ECONNABORTED",
+    "EPIPE",
+    "ETIMEDOUT",
+    "UND_ERR_SOCKET",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_HEADERS_TIMEOUT",
+    "UND_ERR_BODY_TIMEOUT",
+  ].includes(code)) {
+    return true;
+  }
+
+  const message = String(error.message || "").toLowerCase();
+  return [
+    "terminated",
+    "fetch failed",
+    "socket",
+    "other side closed",
+    "connection reset",
+    "tls",
+    "econnreset",
+    "timed out",
+  ].some((fragment) => message.includes(fragment));
+}
+
+function isAttemptTimeoutError(error) {
+  const name = String(error?.name || "");
+  const code = String(error?.code || error?.cause?.code || "").toUpperCase();
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    name === "TimeoutError"
+    || code === "ABORT_ERR"
+    || code === "ATTEMPT_TIMEOUT"
+    || message.includes("timed out")
+  );
+}
+
+function normalizeDeepSeekError(error) {
+  if (!error) {
+    return new Error("DeepSeek request failed.");
+  }
+
+  if (error.name === "AbortError") {
+    return new Error("DeepSeek request timed out.");
+  }
+
+  const status = Number(error.responseStatus || 0);
+  if (status === 429) {
+    return new Error("DeepSeek API is busy right now. Please try again in a moment.");
+  }
+  if (status >= 500) {
+    return new Error("DeepSeek service was temporarily unavailable. Please try again.");
+  }
+
+  if (shouldRetryDeepSeekError(error)) {
+    return new Error("DeepSeek connection dropped during the request. Please try again.");
+  }
+
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function sleepWithSignal(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("DeepSeek request timed out before retry."));
+      return;
+    }
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("DeepSeek request timed out before retry."));
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener?.("abort", onAbort);
+    };
+    signal?.addEventListener?.("abort", onAbort, { once: true });
+  });
+}
+
 
 function extractAssistantText(data) {
   const choice = Array.isArray(data?.choices) ? data.choices[0] : null;
