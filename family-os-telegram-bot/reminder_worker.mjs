@@ -12,7 +12,14 @@ const activityLogPath = runtimePaths.reminderActivityLogPath;
 const fatalLogPath = runtimePaths.reminderFatalLogPath;
 const isSelfTest = process.argv.includes("--self-test");
 const isDryRun = process.argv.includes("--dry-run");
-const dueNowCatchupGraceMs = 5 * 60000;
+const dueNowCatchupGraceMs = Math.max(
+  5,
+  Number(process.env.FAMILY_OS_DUE_NOW_CATCHUP_MINUTES || 15) || 15,
+) * 60000;
+const dueNowLeadMs = Math.max(
+  0,
+  Number(process.env.FAMILY_OS_DUE_NOW_LEAD_MINUTES || 5) || 5,
+) * 60000;
 const persona = loadFamilyOsPersona();
 
 process.on("uncaughtException", (error) => {
@@ -75,10 +82,18 @@ async function collectSnapshot(runtimeConfig, reminderConfig) {
     7,
     ...reminderConfig.recipients.map((recipient) => Number(recipient.preferences?.task_window_days || 7) || 7),
   );
-  const [lowStockItems, upcomingTasks, overdueTasks, taskContextHints] = await Promise.all([
+  const now = new Date();
+  const taskQueryFrom = new Date(now.getTime() - dueNowCatchupGraceMs).toISOString();
+  const taskQueryTo = new Date(now.getTime() + Math.min(maxTaskDays, 30) * 86400000).toISOString();
+  const [lowStockItems, upcomingTasks, overdueTasks, taskWindowTasks, taskContextHints] = await Promise.all([
     invokeFamilyOsApi(runtimeConfig, "get_low_stock_items", {}),
     invokeFamilyOsApi(runtimeConfig, "get_upcoming_tasks", { days: Math.min(maxTaskDays, 30) }),
     invokeFamilyOsApi(runtimeConfig, "get_overdue_tasks", {}),
+    invokeFamilyOsApi(runtimeConfig, "query_tasks", {
+      from: taskQueryFrom,
+      to: taskQueryTo,
+      limit: 100,
+    }),
     invokeFamilyOsApi(runtimeConfig, "get_task_context_hints", { status: "active" }),
   ]);
   return {
@@ -86,6 +101,7 @@ async function collectSnapshot(runtimeConfig, reminderConfig) {
     upcomingTasks: mergeTaskLists(
       Array.isArray(upcomingTasks) ? upcomingTasks : [],
       Array.isArray(overdueTasks) ? overdueTasks : [],
+      Array.isArray(taskWindowTasks) ? taskWindowTasks.filter(isActiveReminderTask) : [],
     ),
     taskContextHints: Array.isArray(taskContextHints) ? taskContextHints : [],
   };
@@ -225,7 +241,7 @@ function buildTaskReminderMessages(recipient, recipientState, upcomingTasks, tas
 
   if (dueNow.length > 0) {
     messages.push([
-      `提提你，以下 ${dueNow.length} 項 task 而家到鐘喇：`,
+      `提提你，以下 ${dueNow.length} 項 task 就快到鐘或者已經到鐘喇：`,
       ...dueNow.flatMap((task) => formatTaskWithHints(task, taskContextHints, timezone, now, { limit: 2 })),
     ].join("\n"));
   }
@@ -571,6 +587,11 @@ function mergeTaskLists(...taskLists) {
   return merged;
 }
 
+function isActiveReminderTask(task) {
+  const status = String(task?.status || "").trim().toLowerCase();
+  return status !== "done" && status !== "cancelled";
+}
+
 function buildTaskReminderKey(task) {
   return `${task?.task_id || task?.task_name || "task"}|${task?.due_at || ""}`;
 }
@@ -578,7 +599,7 @@ function buildTaskReminderKey(task) {
 function shouldSendDueNowReminder(dueAt, now, quietStartedAt) {
   const dueTime = dueAt.getTime();
   const nowTime = now.getTime();
-  if (dueTime <= nowTime && dueTime >= nowTime - dueNowCatchupGraceMs) {
+  if (dueTime <= nowTime + dueNowLeadMs && dueTime >= nowTime - dueNowCatchupGraceMs) {
     return true;
   }
   if (!quietStartedAt) {
@@ -1036,11 +1057,21 @@ function runSelfTest() {
   const dueNowPlan = buildReminderPlan(config, { version: 1, recipients: {} }, {
     lowStockItems: [],
     upcomingTasks: [
-      { task_id: "task_due_now", task_name: "交表", due_at: "2026-06-04 09:28:00+08:00", category: "home" },
+      { task_id: "task_due_now", task_name: "交表", due_at: "2026-06-04 09:20:00+08:00", category: "home" },
     ],
   }, now);
-  if (!dueNowPlan[0]?.messages?.join("\n").includes("而家到鐘")) {
+  if (!dueNowPlan[0]?.messages?.join("\n").includes("就快到鐘")) {
     throw new Error("Expected due-now reminder text.");
+  }
+
+  const dueSoonLeadPlan = buildReminderPlan(config, { version: 1, recipients: {} }, {
+    lowStockItems: [],
+    upcomingTasks: [
+      { task_id: "task_due_soon_lead", task_name: "出門", due_at: "2026-06-04 09:34:00+08:00", category: "home" },
+    ],
+  }, now);
+  if (!dueSoonLeadPlan[0]?.messages?.join("\n").includes("就快到鐘")) {
+    throw new Error("Expected five-minute lead reminder text.");
   }
 
   const quietDueNowPlan = buildReminderPlan(config, { version: 1, recipients: {} }, {
@@ -1049,7 +1080,7 @@ function runSelfTest() {
       { task_id: "task_quiet_due_now", task_name: "夜晚飲水", due_at: "2026-06-04 23:28:00+08:00", category: "home" },
     ],
   }, new Date("2026-06-04T23:30:00+08:00"));
-  if (!quietDueNowPlan[0]?.messages?.join("\n").includes("而家到鐘")) {
+  if (!quietDueNowPlan[0]?.messages?.join("\n").includes("就快到鐘")) {
     throw new Error("Expected due-now reminder to bypass quiet hours.");
   }
 
