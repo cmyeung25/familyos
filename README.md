@@ -36,6 +36,7 @@ The container runtime is Linux-compatible and does not depend on PowerShell or W
 - a mounted instance folder under `/data/instance`
 - a mounted Codex auth cache under `/data/instance/.codex-home` if you keep using Codex login
 - or `FAMILY_OS_LLM_PROVIDER=deepseek` plus `DEEPSEEK_API_KEY` if you switch to DeepSeek API mode
+- or another OpenAI-compatible API provider via `FAMILY_OS_LLM_PROVIDER`, `FAMILY_OS_LLM_MODEL`, `FAMILY_OS_LLM_BASE_URL`, and `FAMILY_OS_LLM_API_KEY`
 - optional extra CA certs under `/data/instance/secrets/certs/*.crt` when the host network path uses TLS interception or a private trust root
 
 ## Phase 3 preview

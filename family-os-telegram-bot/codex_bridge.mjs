@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { ensureParentDirectory, ensureRuntimeDirectories, resolveFamilyOsPaths } from "./instance_paths.mjs";
 import { buildLlmRunOptions, createLlmProvider } from "./llm_provider.mjs";
 import { loadFamilyOsPersona } from "./persona_config.mjs";
+import { normalizeInventoryUnitAlias, resolveInventoryMatch } from "./family_os_api_client.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const runtimePaths = resolveFamilyOsPaths();
@@ -169,9 +170,16 @@ export class CodexBridge {
     const chatState = this.getChatState(stateKey, true);
     const normalizedUserText = String(userText || "").trim();
     const resumeContext = getPendingClarificationContext(chatState);
-    return this.runChatTurn(stateKey, normalizedUserText, telegramUserId, {
+    const stitchedUserText = shouldStitchPendingClarificationAnswer(normalizedUserText, resumeContext)
+      ? buildClarificationResumeInput({
+        pendingClarification: resumeContext,
+        answerText: normalizedUserText,
+      })
+      : normalizedUserText;
+    return this.runChatTurn(stateKey, stitchedUserText, telegramUserId, {
       clearPending: false,
       resumeContext,
+      transcriptUserText: stitchedUserText === normalizedUserText ? null : normalizedUserText,
     });
   }
 
@@ -197,15 +205,25 @@ export class CodexBridge {
       };
     }
 
+    const pendingClarification = chatState.pending_clarification;
     chatState.pending_choices = [];
     chatState.pending_clarification = null;
     chatState.updated_at = new Date().toISOString();
     this.saveState();
 
-    const result = await this.runChatTurn(stateKey, choice.resume_text, telegramUserId, {
+    const result = await this.runChatTurn(
+      stateKey,
+      buildClarificationResumeInput({
+        pendingClarification,
+        answerText: choice.label,
+        suggestedResumeText: choice.resume_text,
+      }),
+      telegramUserId,
+      {
       clearPending: false,
       transcriptUserText: `[button] ${choice.label}`,
-    });
+      },
+    );
     return {
       ...result,
       clear_inline_keyboard: true,
@@ -228,6 +246,18 @@ export class CodexBridge {
       chatState.pending_choices = [];
       chatState.pending_clarification = null;
     }
+
+    const deterministicConsumeEnvelope = this.tryDirectExplicitInventoryConsumeTurn(userText);
+    if (deterministicConsumeEnvelope) {
+      applySuccessfulTurnContext(chatState, deterministicConsumeEnvelope, userText);
+      const reply = this.buildBridgeReply(chatState, deterministicConsumeEnvelope, { sourceUserText: userText });
+      appendRecentTranscript(chatState, "user", transcriptUserText || userText);
+      appendRecentTranscript(chatState, "assistant", reply.text);
+      chatState.updated_at = new Date().toISOString();
+      this.saveState();
+      return reply;
+    }
+
     const session = this.llmProvider.openSession({
       sessionId: chatState.thread_id,
     });
@@ -518,6 +548,89 @@ export class CodexBridge {
       stderr: result.stderr,
       parsed_json: result.parsed_json,
       error: result.error,
+    };
+  }
+
+  tryDirectExplicitInventoryConsumeTurn(userText) {
+    const parsed = parseExplicitInventoryConsumeRequest(userText);
+    if (!parsed) return null;
+
+    const snapshotExecution = this.executeBridgeCommand({
+      command_id: "bb_inventory_api",
+      argv: [
+        "get_inventory_snapshot",
+        "--request-text",
+        userText,
+      ],
+    });
+    if (!snapshotExecution.ok) return null;
+
+    const snapshot = Array.isArray(snapshotExecution?.parsed_json?.result)
+      ? snapshotExecution.parsed_json.result
+      : [];
+    if (snapshot.length === 0) return null;
+
+    const preferredUnit = parsed.unit ? normalizeInventoryUnitAlias(parsed.unit) : "";
+    const match = resolveInventoryMatch(snapshot, parsed.item_name, {
+      preferredUnit,
+      requireExisting: true,
+    });
+    if (match.type !== "exact" || !match.row) {
+      return null;
+    }
+
+    const canonicalUnit = String(match.row.unit || "").trim();
+    const resolvedUnit = resolveSafeExplicitConsumeUnit({
+      spokenUnit: preferredUnit,
+      canonicalUnit,
+      quantity: parsed.quantity,
+    });
+    if (!resolvedUnit) {
+      return null;
+    }
+
+    const commandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "record_inventory_consume_batch",
+        "--payload-json",
+        JSON.stringify({
+          items: [{
+            item_id: match.row.item_id,
+            item_name: match.row.item_name,
+            unit: resolvedUnit,
+            quantity: parsed.quantity,
+            remarks: "Consumed through deterministic explicit inventory consume fallback.",
+          }],
+        }),
+        "--request-text",
+        `${userText}\nDeterministic explicit inventory consume fallback.`,
+      ],
+    };
+    const execution = this.executeBridgeCommand(commandRequest);
+    if (!execution.ok) {
+      return null;
+    }
+
+    return {
+      status: "reply",
+      reply_text: `已幫你扣減咗 ${formatInventoryQuantityForUser(parsed.quantity)} ${formatInventoryUnitForUser(resolvedUnit)}${match.row.item_name}。`,
+      clarification: null,
+      command_request: null,
+      latest_successful_execution: {
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      },
+      successful_executions: [{
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      }],
     };
   }
 
@@ -879,6 +992,40 @@ function buildPendingClarificationPromptBlock(resumeContext) {
     `Original Telegram user message: ${pendingClarification.original_user_text || "[unavailable]"}`,
     `Previous clarification reply shown to the user: ${pendingClarification.last_reply_text || pendingClarification.question}`,
   ].join("\n");
+}
+
+function buildClarificationResumeInput({
+  pendingClarification,
+  answerText,
+  suggestedResumeText = "",
+}) {
+  const normalizedPending = normalizePendingClarification(pendingClarification);
+  const answer = String(answerText || "").trim();
+  const suggested = String(suggestedResumeText || "").trim();
+  if (!normalizedPending || !answer) {
+    return suggested || answer;
+  }
+  const lines = [
+    "Follow-up answer for the pending clarification.",
+    `Original request: ${normalizedPending.original_user_text || "[unavailable]"}`,
+    `Clarification question: ${normalizedPending.question}`,
+    `Clarification answer: ${answer}`,
+  ];
+  if (suggested) {
+    lines.push(`Suggested resolved request: ${suggested}`);
+  }
+  return lines.join("\n");
+}
+
+function shouldStitchPendingClarificationAnswer(userText, pendingClarification) {
+  const normalizedPending = normalizePendingClarification(pendingClarification);
+  const text = String(userText || "").trim();
+  if (!normalizedPending || !text) return false;
+  if (text.length <= 40 && !/[\n]/.test(text)) return true;
+  if (/^(係|係呀|係啊|係喇|唔係|不是|樽|包|盒|支|片|杯|卷|粒|隻|個|罐|枝|\d+(?:\.\d+)?(?:\s*[a-zA-Z%]+)?)$/u.test(text)) {
+    return true;
+  }
+  return false;
 }
 
 function buildTranscriptContextPromptBlock(chatState) {
@@ -1466,6 +1613,73 @@ function normalizeCommandRequest(value) {
   };
 }
 
+function parseExplicitInventoryConsumeRequest(userText) {
+  const text = String(userText || "").trim();
+  if (!text) return null;
+  const match = text.match(/(?:^|.*?\s)?(?:啱啱)?(?:食咗|食左|飲咗|飲左|用咗|用左|開咗|開左)\s*([0-9一二兩三四五六七八九十百半]+(?:\.[0-9]+)?)\s*([個件粒隻片包盒樽支瓶罐杯卷]*)\s*(.+)$/u);
+  if (!match) return null;
+  const quantity = parseLooseCountValue(match[1]);
+  const itemName = String(match[3] || "").trim().replace(/[。！!？?]+$/u, "");
+  if (!Number.isFinite(quantity) || quantity <= 0 || !itemName) {
+    return null;
+  }
+  return {
+    quantity,
+    unit: String(match[2] || "").trim(),
+    item_name: itemName,
+  };
+}
+
+function parseLooseCountValue(value) {
+  const text = String(value || "").trim();
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+  if (text === "半") return 0.5;
+  const digits = {
+    零: 0,
+    一: 1,
+    二: 2,
+    兩: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9,
+  };
+  if (Object.prototype.hasOwnProperty.call(digits, text)) {
+    return digits[text];
+  }
+  if (text === "十") return 10;
+  const teen = text.match(/^十([一二兩三四五六七八九])$/u);
+  if (teen) return 10 + digits[teen[1]];
+  const tens = text.match(/^([一二兩三四五六七八九])十([一二兩三四五六七八九])?$/u);
+  if (tens) {
+    return digits[tens[1]] * 10 + (tens[2] ? digits[tens[2]] : 0);
+  }
+  return Number.NaN;
+}
+
+function resolveSafeExplicitConsumeUnit({ spokenUnit, canonicalUnit, quantity }) {
+  const normalizedSpokenUnit = String(spokenUnit || "").trim();
+  const normalizedCanonicalUnit = String(canonicalUnit || "").trim();
+  if (!normalizedCanonicalUnit) return "";
+  if (!normalizedSpokenUnit) return normalizedCanonicalUnit;
+  if (normalizedSpokenUnit === normalizedCanonicalUnit) return normalizedCanonicalUnit;
+  if (
+    normalizedSpokenUnit === "piece"
+    && Number.isFinite(quantity)
+    && quantity > 0
+    && ["piece", "pack", "box", "bottle", "can", "cup", "roll"].includes(normalizedCanonicalUnit)
+  ) {
+    return normalizedCanonicalUnit;
+  }
+  return "";
+}
+
 function applyPersonaReplyStyle(text, { mode = "reply" } = {}) {
   const raw = String(text || "").trim();
   if (!raw) return raw;
@@ -1607,7 +1821,7 @@ if (isMainModule && process.argv.includes("--self-test")) {
   if (!Object.values(health.checks.references).every(Boolean)) {
     throw new Error("Bridge health failed: one or more runtime reference files are missing.");
   }
-  if (!["codex", "deepseek"].includes(options.provider) || !options.model || options.modelReasoningEffort !== "medium") {
+  if (!options.provider || !options.model || options.modelReasoningEffort !== "medium") {
     throw new Error("Bridge self-test failed: thread model options are invalid.");
   }
   if (options.networkAccessEnabled !== true || options.approvalPolicy !== "never") {
@@ -1646,6 +1860,22 @@ if (isMainModule && process.argv.includes("--self-test")) {
   });
   if (!preflightExecution.ok || preflightExecution.exit_code !== 0 || !/self-test passed/i.test(preflightExecution.stdout)) {
     throw new Error("Bridge self-test failed: inventory unit preflight helper execution is invalid.");
+  }
+
+  const explicitConsume = parseExplicitInventoryConsumeRequest("食咗一個乳酪");
+  if (
+    !explicitConsume
+    || explicitConsume.item_name !== "乳酪"
+    || explicitConsume.quantity !== 1
+    || explicitConsume.unit !== "個"
+  ) {
+    throw new Error("Bridge self-test failed: explicit inventory consume parsing is invalid.");
+  }
+  if (resolveSafeExplicitConsumeUnit({ spokenUnit: "piece", canonicalUnit: "cup", quantity: 1 }) !== "cup") {
+    throw new Error("Bridge self-test failed: generic count-word unit alignment is invalid.");
+  }
+  if (resolveSafeExplicitConsumeUnit({ spokenUnit: "box", canonicalUnit: "bottle", quantity: 1 }) !== "") {
+    throw new Error("Bridge self-test failed: unsafe inventory unit alignment should be rejected.");
   }
 
   const originalStructuredTurn = bridge.runStructuredTurnWithTimeout;
@@ -1794,6 +2024,65 @@ if (isMainModule && process.argv.includes("--self-test")) {
     || !/Original Telegram user message: 記錯咗 冇食到 幫我加返一包/.test(resumedPrompt)
   ) {
     throw new Error("Bridge self-test failed: free-text clarification resume context is invalid.");
+  }
+
+  const stitchedClarificationInput = buildClarificationResumeInput({
+    pendingClarification: {
+      question: "請問「白胡椒粉」屬於邊一類？",
+      allow_free_text: true,
+      original_user_text: "加入白胡椒粉到存貨，唔設定數量",
+      last_reply_text: "請問「白胡椒粉」屬於邊一類？",
+    },
+    answerText: "調味料",
+    suggestedResumeText: "白胡椒粉分類係調味料。",
+  });
+  if (
+    !/Original request: 加入白胡椒粉到存貨，唔設定數量/.test(stitchedClarificationInput)
+    || !/Clarification answer: 調味料/.test(stitchedClarificationInput)
+    || !/Suggested resolved request: 白胡椒粉分類係調味料。/.test(stitchedClarificationInput)
+  ) {
+    throw new Error("Bridge self-test failed: clarification stitching is invalid.");
+  }
+
+  let capturedResumeTurn = null;
+  const callbackBridge = new CodexBridge({ workspace: bridge.workspace });
+  callbackBridge.saveState = () => {};
+  callbackBridge.state = normalizeBridgeState({
+    chats: {
+      callback_chat: {
+        thread_id: "thread_callback",
+        pending_choices: [{
+          token: "cb_choice",
+          label: "調味料",
+          resume_text: "白胡椒粉分類係調味料。",
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60000).toISOString(),
+        }],
+        pending_clarification: {
+          question: "請問「白胡椒粉」屬於邊一類？",
+          allow_free_text: true,
+          original_user_text: "加入白胡椒粉到存貨，唔設定數量",
+          last_reply_text: "請問「白胡椒粉」屬於邊一類？",
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60000).toISOString(),
+        },
+      },
+    },
+  });
+  callbackBridge.runChatTurn = async (stateKey, userText, telegramUserId, options) => {
+    capturedResumeTurn = { stateKey, userText, telegramUserId, options };
+    return { text: "ok", reply_markup: null };
+  };
+  await callbackBridge.resumeFromCallback("callback_chat", "cb_choice", { telegramUserId: "42" });
+  if (
+    !capturedResumeTurn
+    || capturedResumeTurn.stateKey !== "callback_chat"
+    || capturedResumeTurn.options?.transcriptUserText !== "[button] 調味料"
+    || !/Original request: 加入白胡椒粉到存貨，唔設定數量/.test(capturedResumeTurn.userText)
+    || !/Clarification answer: 調味料/.test(capturedResumeTurn.userText)
+    || !/Suggested resolved request: 白胡椒粉分類係調味料。/.test(capturedResumeTurn.userText)
+  ) {
+    throw new Error("Bridge self-test failed: callback clarification stitching is invalid.");
   }
 
   const chatState = normalizeChatState({

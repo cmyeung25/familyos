@@ -69,7 +69,9 @@ The script checks the standalone Family OS API configuration, stores local
 secrets in Windows DPAPI-encrypted files, and validates Bot startup. Do not paste
 secrets into chat, Git, or Google Sheets. Natural-language understanding uses the
 local Codex login by default. Alternatively, set `FAMILY_OS_LLM_PROVIDER=deepseek`
-and provide `DEEPSEEK_API_KEY`. `OPENAI_API_KEY` is not used.
+and provide `DEEPSEEK_API_KEY`. You can also point to another OpenAI-compatible
+provider with `FAMILY_OS_LLM_PROVIDER`, `FAMILY_OS_LLM_MODEL`,
+`FAMILY_OS_LLM_BASE_URL`, and `FAMILY_OS_LLM_API_KEY`. `OPENAI_API_KEY` is not used.
 
 If you stay on Codex mode and `codex login status` says `Not logged in`, run
 `codex login --device-auth` in the same Windows user session and sign in with

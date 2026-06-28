@@ -1205,6 +1205,10 @@ function normalizeInventoryCategoryAlias(category) {
     "食物": "groceries",
     "食品": "groceries",
     "乾貨": "groceries",
+    "食材": "groceries",
+    "調味料": "groceries",
+    "調味品": "groceries",
+    "香料": "groceries",
   };
   return aliases[raw] || raw;
 }
@@ -1902,6 +1906,10 @@ export async function runFamilyOsApiClientSelfTest() {
   const batteryAliasCategory = normalizeInventoryCategoryAlias("家居用品");
   if (batteryAliasCategory !== "other") {
     throw new Error("Inventory category alias self-test failed: 家居用品 should normalize to other.");
+  }
+  const seasoningAliasCategory = normalizeInventoryCategoryAlias("調味料");
+  if (seasoningAliasCategory !== "groceries") {
+    throw new Error("Inventory category alias self-test failed: 調味料 should normalize to groceries.");
   }
   const batterySnapshot = [
     { item_id: "itm_aa", item_name: "AA電芯", unit: "piece", category: "other", quantity_on_hand: 8 },

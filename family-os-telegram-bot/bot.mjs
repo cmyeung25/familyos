@@ -652,16 +652,28 @@ function buildCallbackAckText(query) {
 function formatTurnErrorReply(error) {
   const message = String(error?.message || error || "").trim();
   const lower = message.toLowerCase();
-  if (lower.includes("deepseek connection dropped")) {
-    return `${persona.firstPersonStyle}啱啱同 DeepSeek 連線時斷咗一下，你而家再試一次，${persona.firstPersonStyle}再幫你處理。`;
+  if (
+    lower.includes("connection dropped during the request")
+    || lower.includes("deepseek connection dropped")
+  ) {
+    return `${persona.firstPersonStyle}啱啱同 AI 幫手連線時斷咗一下，你而家再試一次，${persona.firstPersonStyle}再幫你處理。`;
   }
-  if (lower.includes("deepseek request timed out")) {
+  if (
+    lower.includes("request timed out")
+    || lower.includes("deepseek request timed out")
+  ) {
     return `${persona.firstPersonStyle}啱啱處理得太耐，今次未趕得切完成。你而家再試一次，或者分開兩句問我會穩陣啲。`;
   }
-  if (lower.includes("deepseek service was temporarily unavailable")) {
-    return `${persona.firstPersonStyle}啱啱搵 DeepSeek 幫手時對方有啲忙，你隔一陣再試一次呀。`;
+  if (
+    lower.includes("service was temporarily unavailable")
+    || lower.includes("deepseek service was temporarily unavailable")
+  ) {
+    return `${persona.firstPersonStyle}啱啱搵 AI 幫手時對方有啲忙，你隔一陣再試一次呀。`;
   }
-  if (lower.includes("deepseek api is busy right now")) {
+  if (
+    lower.includes("api is busy right now")
+    || lower.includes("deepseek api is busy right now")
+  ) {
     return `${persona.firstPersonStyle}啱啱個服務有啲塞車，你隔一陣再試一次呀。`;
   }
   return `${persona.firstPersonStyle}啱啱卡住咗：${message}`;
