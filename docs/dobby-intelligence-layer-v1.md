@@ -36,6 +36,7 @@ The bridge can now handle these clear requests before calling the LLM:
 
 - household memory save, such as `幫我記住成長椅嘅工具放咗喺工具箱`
 - household memory location query, such as `成長椅嘅工具喺邊`
+- future BB appointment calendar writes, such as `BB 2026-09-25 11:15 屯門醫院覆診`
 - inventory safety-stock updates, such as `幫我設定返白胡椒粉嘅安全存量係一樽`
 - explicit inventory consume fallback, including clear multi-item consume such as `食咗一個公仔麵，同一隻雞蛋`
 - ambiguous multi-item consume clarification, such as `食咗一個公仔麵，同一隻蛋`, where choosing `雞蛋` resumes the whole batch consume without relying on another LLM turn
@@ -68,6 +69,7 @@ v1 does not implement:
 The bridge self-test covers:
 
 - Dobby Intelligence prompt packet presence
+- BB Calendar deterministic appointment path
 - household memory save path
 - household memory query path
 - safety-stock deterministic update path

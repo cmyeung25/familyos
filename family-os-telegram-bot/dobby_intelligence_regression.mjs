@@ -57,6 +57,27 @@ bridge.executeBridgeCommand = (commandRequest) => {
       ...payload,
     });
   }
+  if (action === "append_bb_calendar_event") {
+    const payload = payloadOf(commandRequest);
+    return ok(action, {
+      calendar_event: {
+        calendar_event_id: "evt_bb_followup",
+        title: payload.title,
+        event_type: payload.event_type,
+        start_at: payload.start_at,
+        end_at: payload.start_at.replace("11:15:00", "12:15:00"),
+        location: payload.location,
+        description: payload.description,
+      },
+      task: {
+        task_id: "tsk_bb_followup",
+        task_name: payload.title,
+        due_at: payload.start_at,
+        status: "open",
+        category: "medical",
+      },
+    });
+  }
   if (action === "query_household_memory") {
     const payload = payloadOf(commandRequest);
     const subject = String(payload.subject || "").trim();
@@ -111,6 +132,7 @@ bridge.executeBridgeCommand = (commandRequest) => {
 };
 
 assertContextPacket();
+assertBbCalendarDirectPath();
 assertHouseholdMemoryDirectPaths();
 assertSafetyStockDirectPath();
 assertSingleRestockDirectPath();
@@ -129,6 +151,33 @@ function assertContextPacket() {
   const safetyPrompt = bridge.buildFamilyOsAgentPrompt("幫我設定返白胡椒粉嘅安全存量係一樽", "7476829331", {}, null);
   assert.match(safetyPrompt, /likely_domain: inventory/);
   assert.match(safetyPrompt, /deterministic_candidate: inventory_safety_stock/);
+
+  const bbCalendarPrompt = bridge.buildFamilyOsAgentPrompt(bbCalendarAppointmentText(), "7476829331", {}, null);
+  assert.match(bbCalendarPrompt, /likely_domain: baby/);
+  assert.match(bbCalendarPrompt, /deterministic_candidate: bb_calendar_appointment/);
+}
+
+function assertBbCalendarDirectPath() {
+  commandLog.length = 0;
+  bridge.reminderRecipientMap = {
+    7476829331: {
+      primary_person_id: "per_husband",
+    },
+  };
+  const envelope = bridge.tryDirectBbCalendarAppointmentTurn(bbCalendarAppointmentText(), "7476829331");
+  assert.equal(envelope?.status, "reply");
+  const calendarCommand = commandLog.find((command) => command?.argv?.[0] === "append_bb_calendar_event");
+  assert.ok(calendarCommand, "expected append_bb_calendar_event command");
+  assert.equal(commandLog.some((command) => command?.argv?.[0] === "append_task"), false, "BB appointment must not be routed to append_task directly");
+  const payload = payloadOf(calendarCommand);
+  assert.equal(payload.event_type, "clinic_visit");
+  assert.equal(payload.title, "BB覆診 - 屯門醫院");
+  assert.match(payload.start_at, /^[0-9]{4}-09-25 11:15:00\+08:00$/);
+  assert.equal(payload.location, "屯門醫院");
+  assert.equal(payload.related_person_id, "per_baby");
+  assert.equal(payload.owner_person_id, "per_husband");
+  assert.equal(payload.duration_minutes, 60);
+  assert.equal(envelope.latest_successful_execution?.execution?.parsed_json?.action, "append_bb_calendar_event");
 }
 
 function assertHouseholdMemoryDirectPaths() {
@@ -293,4 +342,8 @@ function payloadOf(commandRequest) {
 
 function pick(value, keys) {
   return Object.fromEntries(keys.map((key) => [key, value[key]]));
+}
+
+function bbCalendarAppointmentText() {
+  return Buffer.from("5aSa5q+U5aSa5q+U77yM5bmr5oiR6KiY5b6XQkLopoHkv4I55pyIMjXml6Xml6nkuIoxMem7njE15YiG5L+C5bGv6ZaA6Yar6Zmi6KaG6Ki6", "base64").toString("utf8");
 }

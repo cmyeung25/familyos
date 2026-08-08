@@ -247,6 +247,17 @@ export class CodexBridge {
       chatState.pending_clarification = null;
     }
 
+    const deterministicBbCalendarEnvelope = this.tryDirectBbCalendarAppointmentTurn(userText, telegramUserId);
+    if (deterministicBbCalendarEnvelope) {
+      applySuccessfulTurnContext(chatState, deterministicBbCalendarEnvelope, userText);
+      const reply = this.buildBridgeReply(chatState, deterministicBbCalendarEnvelope, { sourceUserText: userText });
+      appendRecentTranscript(chatState, "user", transcriptUserText || userText);
+      appendRecentTranscript(chatState, "assistant", reply.text);
+      chatState.updated_at = new Date().toISOString();
+      this.saveState();
+      return reply;
+    }
+
     const deterministicMemoryEnvelope = this.tryDirectHouseholdMemoryTurn(userText);
     if (deterministicMemoryEnvelope) {
       applySuccessfulTurnContext(chatState, deterministicMemoryEnvelope, userText);
@@ -600,6 +611,62 @@ export class CodexBridge {
       stderr: result.stderr,
       parsed_json: result.parsed_json,
       error: result.error,
+    };
+  }
+
+  tryDirectBbCalendarAppointmentTurn(userText, telegramUserId = "") {
+    const parsed = parseDirectBbCalendarAppointmentRequest(userText);
+    if (!parsed) return null;
+
+    const senderIdentity = this.reminderRecipientMap[String(telegramUserId || "")] || null;
+    const commandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "append_bb_calendar_event",
+        "--payload-json",
+        JSON.stringify({
+          event_type: parsed.event_type,
+          title: parsed.title,
+          start_at: parsed.start_at,
+          duration_minutes: parsed.duration_minutes,
+          location: parsed.location,
+          description: parsed.description,
+          owner_person_id: senderIdentity?.primary_person_id || "",
+          related_person_id: parsed.related_person_id,
+          priority: "medium",
+          status: "open",
+          remarks: "Recorded through Dobby Intelligence Layer v1 deterministic BB calendar path.",
+        }),
+        "--request-text",
+        `${userText}\nDobby Intelligence Layer v1 deterministic BB calendar write.`,
+      ],
+    };
+    const execution = this.executeBridgeCommand(commandRequest);
+    const executionEntry = {
+      command_request: {
+        command_id: commandRequest.command_id,
+        argv: [...commandRequest.argv],
+      },
+      execution,
+    };
+    if (!execution.ok) {
+      return {
+        status: "desktop_required",
+        reply_text: "呢個似係BB日程，但Google Calendar暫時寫入唔成功；多比唔會改寫成普通提醒，避免記錯位置。請稍後再試或用Desktop檢查Calendar設定。",
+        clarification: null,
+        command_request: null,
+        latest_successful_execution: null,
+        successful_executions: [],
+      };
+    }
+
+    return {
+      status: "reply",
+      reply_text: buildDirectBbCalendarAppointmentReply(parsed, execution),
+      clarification: null,
+      command_request: null,
+      latest_successful_execution: executionEntry,
+      successful_executions: [executionEntry],
     };
   }
 
@@ -1264,6 +1331,9 @@ function normalizeResultEntity(value) {
     due_at: String(source.due_at || "").trim(),
     status: String(source.status || "").trim(),
     category: String(source.category || "").trim(),
+    location: String(source.location || "").trim(),
+    memory_type: String(source.memory_type || "").trim(),
+    confidence: String(source.confidence || "").trim(),
     unit: String(source.unit || "").trim(),
     next_expiry_date: String(source.next_expiry_date || "").trim(),
     quantity_on_hand: source.quantity_on_hand === undefined || source.quantity_on_hand === null || source.quantity_on_hand === ""
@@ -1520,6 +1590,7 @@ function analyzeDobbyIntelligenceSignals(userText, chatState, resumeContext, sen
   const recentEntities = Array.isArray(chatState?.last_result_entities)
     ? chatState.last_result_entities.map(normalizeResultEntity).filter(Boolean)
     : [];
+  const bbCalendarAppointmentRequest = parseDirectBbCalendarAppointmentRequest(text);
   const memoryRequest = parseDirectHouseholdMemoryRequest(text);
   const safetyStockRequest = parseDirectInventorySafetyStockRequest(text);
   const restockBatchRequest = parseExplicitInventoryRestockBatchRequest(text);
@@ -1531,7 +1602,12 @@ function analyzeDobbyIntelligenceSignals(userText, chatState, resumeContext, sen
   let risk = "normal";
   let deterministicCandidate = "";
 
-  if (memoryRequest) {
+  if (bbCalendarAppointmentRequest) {
+    domain = "baby";
+    turnType = "bb_calendar_write";
+    risk = "state_changing_write";
+    deterministicCandidate = "bb_calendar_appointment";
+  } else if (memoryRequest) {
     domain = "household_memory";
     turnType = memoryRequest.action === "append" ? "memory_write" : "memory_read";
     risk = memoryRequest.action === "append" ? "state_changing_write" : "read";
@@ -1617,7 +1693,7 @@ function looksLikeImmediateCorrection(userText, lastAction, entities) {
   const text = String(userText || "").trim();
   if (!text || !lastAction || entities.length === 0) return false;
   const actionSet = new Set(lastAction.actions.map((entry) => String(entry || "").trim()));
-  const recentWrite = ["append_task", "update_task", "append_baby_log", "record_inventory_purchase_batch", "record_inventory_consume_batch", "set_inventory_stock_level", "update_inventory_expiry_date", "upsert_inventory_item", "append_household_memory"]
+  const recentWrite = ["append_task", "update_task", "append_baby_log", "append_bb_calendar_event", "record_inventory_purchase_batch", "record_inventory_consume_batch", "set_inventory_stock_level", "update_inventory_expiry_date", "upsert_inventory_item", "append_household_memory"]
     .some((action) => actionSet.has(action));
   if (!recentWrite) return false;
   if (/(先啱|先岩|更正|改返|改做|唔係|不是|其實|今日係|應該係|搞錯|記錯)/.test(text)) return true;
@@ -1702,6 +1778,7 @@ function isStateChangingAction(executionEntry) {
     "update_inventory_expiry_date",
     "upsert_inventory_item",
     "append_household_memory",
+    "append_bb_calendar_event",
   ]).has(action);
 }
 
@@ -1711,6 +1788,9 @@ function extractResultEntitiesFromExecution(action, result) {
   if (["append_task", "update_task"].includes(normalizedAction)) {
     const entity = buildTaskResultEntity(result);
     return entity ? [entity] : [];
+  }
+  if (normalizedAction === "append_bb_calendar_event") {
+    return buildBbCalendarResultEntities(result);
   }
   if (normalizedAction === "append_household_memory") {
     const entity = buildHouseholdMemoryResultEntity(result);
@@ -1747,6 +1827,27 @@ function buildTaskResultEntity(task) {
     category: task.category,
   });
   return entity;
+}
+
+function buildBbCalendarResultEntities(result) {
+  const source = result && typeof result === "object" ? result : {};
+  const calendarEvent = source.calendar_event && typeof source.calendar_event === "object"
+    ? source.calendar_event
+    : {};
+  const entities = [];
+  const calendarEntity = normalizeResultEntity({
+    kind: "bb_calendar_event",
+    entity_id: calendarEvent.calendar_event_id,
+    name: calendarEvent.title,
+    due_at: calendarEvent.start_at,
+    status: "open",
+    category: calendarEvent.event_type || "bb_calendar",
+    location: calendarEvent.location,
+  });
+  if (calendarEntity) entities.push(calendarEntity);
+  const taskEntity = buildTaskResultEntity(source.task);
+  if (taskEntity) entities.push(taskEntity);
+  return entities;
 }
 
 function buildInventoryResultEntity(item) {
@@ -1844,7 +1945,7 @@ function deriveBridgeClarificationQuestionFromExecutionHistory(executionHistory,
   if (action === "inventory_unit_preflight") {
     return `${persona.firstPersonStyle}仲差少少資料先可以安全記錄，你想用邊個 item 名稱或者單位呀？`;
   }
-  if (["query_tasks", "update_task", "append_task"].includes(action)) {
+  if (["query_tasks", "update_task", "append_task", "append_bb_calendar_event"].includes(action)) {
     return `${persona.firstPersonStyle}想先確認清楚係邊一個 task。你可以講多一句任務名稱、日期、時間，或者地點嗎？`;
   }
   if (["query_household_memory", "append_household_memory"].includes(action)) {
@@ -2142,6 +2243,207 @@ function normalizeCommandRequest(value) {
       ? source.argv.map((entry) => String(entry || ""))
       : [],
   };
+}
+
+function parseDirectBbCalendarAppointmentRequest(userText) {
+  const text = stripDobbyInvocation(String(userText || "").normalize("NFKC").trim());
+  if (!text) return null;
+  if (!looksLikeBbCalendarAppointmentText(text)) return null;
+
+  const dateParts = parseBbCalendarDateParts(text);
+  const timeParts = parseBbCalendarTimeParts(text);
+  if (!dateParts || !timeParts) return null;
+
+  const year = resolveBbCalendarYear(dateParts.year, dateParts.month, dateParts.day);
+  if (!isValidBbCalendarDate(year, dateParts.month, dateParts.day)) return null;
+  if (!isValidBbCalendarTime(timeParts.hour, timeParts.minute)) return null;
+
+  const eventType = inferBbCalendarEventType(text);
+  const location = extractBbCalendarLocation(text);
+  const title = buildDirectBbCalendarTitle(eventType, location);
+  const startAt = [
+    `${year}-${pad2(dateParts.month)}-${pad2(dateParts.day)}`,
+    `${pad2(timeParts.hour)}:${pad2(timeParts.minute)}:00+08:00`,
+  ].join(" ");
+
+  return {
+    event_type: eventType,
+    title,
+    start_at: startAt,
+    duration_minutes: 60,
+    location,
+    description: title,
+    related_person_id: eventType === "prenatal_check" ? "per_wife" : "per_baby",
+  };
+}
+
+function stripDobbyInvocation(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^[\s,，。.!！?？]*(?:多比|dobby|Dobby|多啦B夢|多啦B梦){1,2}\s*[,，。.!！?？]*/u, "")
+    .trim();
+}
+
+function looksLikeBbCalendarAppointmentText(text) {
+  const value = String(text || "");
+  const hasBabyTarget = /(?:\bBB\b|baby|寶寶|小桃B|小桃)/iu.test(value);
+  const hasAppointmentKeyword = /(?:覆診|複診|打針|疫苗|母嬰院|醫院|診所|覆查|檢查|產檢|checkup|follow[-\s]?up)/iu.test(value);
+  const hasWriteVerb = /(?:記得|記低|加入|加到|放入|提我|提醒|日程|calendar|Calendar|Google Calendar)/iu.test(value);
+  return hasAppointmentKeyword && (hasBabyTarget || /產檢/u.test(value)) && hasWriteVerb;
+}
+
+function parseBbCalendarDateParts(text) {
+  const value = String(text || "");
+  const iso = value.match(/(?:^|[^\d])(20\d{2})[-/](\d{1,2})[-/](\d{1,2})(?:$|[^\d])/u);
+  if (iso) {
+    return {
+      year: Number(iso[1]),
+      month: Number(iso[2]),
+      day: Number(iso[3]),
+    };
+  }
+
+  const chinese = value.match(/(?:(20\d{2})\s*年\s*)?(\d{1,2})\s*月\s*(\d{1,2})\s*(?:日|號|号)?/u);
+  if (chinese) {
+    return {
+      year: chinese[1] ? Number(chinese[1]) : null,
+      month: Number(chinese[2]),
+      day: Number(chinese[3]),
+    };
+  }
+
+  const slash = value.match(/(?:^|[^\d])(\d{1,2})[/-](\d{1,2})(?:$|[^\d])/u);
+  if (slash) {
+    return {
+      year: null,
+      month: Number(slash[1]),
+      day: Number(slash[2]),
+    };
+  }
+
+  return null;
+}
+
+function parseBbCalendarTimeParts(text) {
+  const value = String(text || "");
+  const colon = value.match(/(?:^|[^\d])(\d{1,2})[:：](\d{2})(?:$|[^\d])/u);
+  if (colon) {
+    return adjustBbCalendarHourForPeriod({
+      hour: Number(colon[1]),
+      minute: Number(colon[2]),
+      period: extractTimePeriodNear(value, colon.index || 0),
+    });
+  }
+
+  const hourMinute = value.match(/(早上|上午|朝早|中午|下午|下晝|晚上|夜晚)?\s*(\d{1,2})\s*(?:點|点|時|时)\s*(半|(\d{1,2})\s*分?)?/u);
+  if (!hourMinute) return null;
+  return adjustBbCalendarHourForPeriod({
+    hour: Number(hourMinute[2]),
+    minute: hourMinute[3] === "半" ? 30 : Number(hourMinute[4] || 0),
+    period: hourMinute[1] || "",
+  });
+}
+
+function extractTimePeriodNear(text, index) {
+  const prefix = String(text || "").slice(Math.max(0, Number(index || 0) - 8), Number(index || 0));
+  const match = prefix.match(/(早上|上午|朝早|中午|下午|下晝|晚上|夜晚)\s*$/u);
+  return match ? match[1] : "";
+}
+
+function adjustBbCalendarHourForPeriod({ hour, minute, period }) {
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  let adjustedHour = hour;
+  if (/^(下午|下晝|晚上|夜晚)$/u.test(period) && adjustedHour < 12) adjustedHour += 12;
+  if (/^中午$/u.test(period) && adjustedHour < 11) adjustedHour += 12;
+  if (/^(早上|上午|朝早)$/u.test(period) && adjustedHour === 12) adjustedHour = 0;
+  return {
+    hour: adjustedHour,
+    minute,
+  };
+}
+
+function resolveBbCalendarYear(explicitYear, month, day, now = new Date()) {
+  if (Number.isInteger(explicitYear) && explicitYear >= 2000 && explicitYear <= 2100) {
+    return explicitYear;
+  }
+  const today = formatHongKongTimestamp(now).slice(0, 10);
+  const currentYear = Number(today.slice(0, 4));
+  const candidate = `${currentYear}-${pad2(month)}-${pad2(day)}`;
+  return candidate < today ? currentYear + 1 : currentYear;
+}
+
+function isValidBbCalendarDate(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function isValidBbCalendarTime(hour, minute) {
+  return Number.isInteger(hour) && Number.isInteger(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+function inferBbCalendarEventType(text) {
+  const value = String(text || "");
+  if (/產檢/u.test(value)) return "prenatal_check";
+  if (/(打針|疫苗)/u.test(value)) return "vaccination";
+  if (/(覆診|複診|覆查)/u.test(value)) return "clinic_visit";
+  if (/(醫生|睇醫生)/u.test(value)) return "doctor_visit";
+  if (/(檢查|checkup)/iu.test(value)) return "checkup";
+  return "other";
+}
+
+function extractBbCalendarLocation(text) {
+  const value = String(text || "");
+  const beforeAppointment = value.match(/(?:係|喺|在)\s*([^係喺在，,。；;\n]+?)\s*(?:覆診|複診|覆查|打針|疫苗|產檢|檢查|checkup|follow[-\s]?up)/iu);
+  if (beforeAppointment) return cleanBbCalendarLocation(beforeAppointment[1]);
+
+  const knownPlace = value.match(/([^，,。；;\s\n]+(?:醫院|母嬰院|診所))/u);
+  if (knownPlace) return cleanBbCalendarLocation(knownPlace[1]);
+
+  return "";
+}
+
+function cleanBbCalendarLocation(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^(?:係|喺|在)\s*/u, "")
+    .replace(/\s*(?:覆診|複診|覆查|打針|疫苗|產檢|檢查|checkup|follow[-\s]?up).*$/iu, "")
+    .replace(/[，,。；;.!！?？]+$/u, "")
+    .trim();
+}
+
+function buildDirectBbCalendarTitle(eventType, location) {
+  const labels = {
+    vaccination: "BB打針",
+    clinic_visit: "BB覆診",
+    doctor_visit: "BB睇醫生",
+    checkup: "BB檢查",
+    prenatal_check: "產檢",
+    other: "BB日程",
+  };
+  const label = labels[eventType] || labels.other;
+  return location ? `${label} - ${location}` : label;
+}
+
+function buildDirectBbCalendarAppointmentReply(parsed, execution) {
+  const result = execution?.parsed_json?.result || {};
+  const event = result.calendar_event || {};
+  const task = result.task || {};
+  const title = String(event.title || parsed.title || "BB日程").trim();
+  const startAt = String(event.start_at || parsed.start_at || "").trim();
+  const location = String(event.location || parsed.location || "").trim();
+  const taskId = String(task.task_id || "").trim();
+  return [
+    `已經加入BB Calendar：${title}`,
+    startAt ? `時間：${startAt}` : "",
+    location ? `地點：${location}` : "",
+    taskId ? `同步提醒任務：${taskId}` : "同步提醒任務已建立",
+  ].filter(Boolean).join("\n");
+}
+
+function pad2(value) {
+  return String(Number(value || 0)).padStart(2, "0");
 }
 
 function parseDirectHouseholdMemoryRequest(userText) {

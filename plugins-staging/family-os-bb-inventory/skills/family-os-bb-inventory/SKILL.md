@@ -154,6 +154,7 @@ The Telegram bridge may handle a narrow set of clear high-confidence requests be
 
 - clear item-location memory save, for example `幫我記住成長椅嘅工具放咗喺工具箱`
 - clear item-location memory query, for example `成長椅嘅工具喺邊`
+- clear future BB appointment calendar writes, for example `BB 2026-09-25 11:15 屯門醫院覆診`
 - clear existing-item safety-stock update, for example `幫我設定返白胡椒粉嘅安全存量係一樽`
 - explicit inventory consume
 - explicit batch restock
