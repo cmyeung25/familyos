@@ -247,10 +247,54 @@ export class CodexBridge {
       chatState.pending_clarification = null;
     }
 
+    const deterministicMemoryEnvelope = this.tryDirectHouseholdMemoryTurn(userText);
+    if (deterministicMemoryEnvelope) {
+      applySuccessfulTurnContext(chatState, deterministicMemoryEnvelope, userText);
+      const reply = this.buildBridgeReply(chatState, deterministicMemoryEnvelope, { sourceUserText: userText });
+      appendRecentTranscript(chatState, "user", transcriptUserText || userText);
+      appendRecentTranscript(chatState, "assistant", reply.text);
+      chatState.updated_at = new Date().toISOString();
+      this.saveState();
+      return reply;
+    }
+
+    const deterministicSafetyStockEnvelope = this.tryDirectInventorySafetyStockTurn(userText);
+    if (deterministicSafetyStockEnvelope) {
+      applySuccessfulTurnContext(chatState, deterministicSafetyStockEnvelope, userText);
+      const reply = this.buildBridgeReply(chatState, deterministicSafetyStockEnvelope, { sourceUserText: userText });
+      appendRecentTranscript(chatState, "user", transcriptUserText || userText);
+      appendRecentTranscript(chatState, "assistant", reply.text);
+      chatState.updated_at = new Date().toISOString();
+      this.saveState();
+      return reply;
+    }
+
     const deterministicConsumeEnvelope = this.tryDirectExplicitInventoryConsumeTurn(userText);
     if (deterministicConsumeEnvelope) {
       applySuccessfulTurnContext(chatState, deterministicConsumeEnvelope, userText);
       const reply = this.buildBridgeReply(chatState, deterministicConsumeEnvelope, { sourceUserText: userText });
+      appendRecentTranscript(chatState, "user", transcriptUserText || userText);
+      appendRecentTranscript(chatState, "assistant", reply.text);
+      chatState.updated_at = new Date().toISOString();
+      this.saveState();
+      return reply;
+    }
+
+    const deterministicRestockBatchEnvelope = this.tryDirectExplicitInventoryRestockBatchTurn(userText);
+    if (deterministicRestockBatchEnvelope) {
+      applySuccessfulTurnContext(chatState, deterministicRestockBatchEnvelope, userText);
+      const reply = this.buildBridgeReply(chatState, deterministicRestockBatchEnvelope, { sourceUserText: userText });
+      appendRecentTranscript(chatState, "user", transcriptUserText || userText);
+      appendRecentTranscript(chatState, "assistant", reply.text);
+      chatState.updated_at = new Date().toISOString();
+      this.saveState();
+      return reply;
+    }
+
+    const deterministicShoppingDoneEnvelope = this.tryDirectExplicitShoppingTaskDoneTurn(userText, chatState);
+    if (deterministicShoppingDoneEnvelope) {
+      applySuccessfulTurnContext(chatState, deterministicShoppingDoneEnvelope, userText);
+      const reply = this.buildBridgeReply(chatState, deterministicShoppingDoneEnvelope, { sourceUserText: userText });
       appendRecentTranscript(chatState, "user", transcriptUserText || userText);
       appendRecentTranscript(chatState, "assistant", reply.text);
       chatState.updated_at = new Date().toISOString();
@@ -380,10 +424,17 @@ export class CodexBridge {
       .map((commandDef) => `- ${commandDef.command_id}: runner=${commandDef.runner}, path=${commandDef.path}`)
       .join("\n");
     const localTimeBlock = buildLocalTimePromptBlock();
-    const senderIdentityBlock = buildSenderIdentityPromptBlock(this.reminderRecipientMap[String(telegramUserId || "")] || null);
+    const senderIdentity = this.reminderRecipientMap[String(telegramUserId || "")] || null;
+    const senderIdentityBlock = buildSenderIdentityPromptBlock(senderIdentity);
     const recentChatContextBlock = buildRecentChatContextPromptBlock(chatState, userText);
     const transcriptContextBlock = buildTranscriptContextPromptBlock(chatState);
     const pendingClarificationBlock = buildPendingClarificationPromptBlock(resumeContext);
+    const dobbyIntelligenceBlock = buildDobbyIntelligencePromptBlock({
+      userText,
+      chatState,
+      resumeContext,
+      senderIdentity,
+    });
 
     return [
       "This message comes from the allowlisted private Family OS Telegram bridge.",
@@ -418,6 +469,7 @@ export class CodexBridge {
       ...(senderIdentityBlock ? ["", senderIdentityBlock] : []),
       "",
       localTimeBlock,
+      ...(dobbyIntelligenceBlock ? ["", dobbyIntelligenceBlock] : []),
       "",
       "Current runtime knowledge:",
       promptContext.learnedKnowledge,
@@ -554,6 +606,9 @@ export class CodexBridge {
   tryDirectExplicitInventoryConsumeTurn(userText) {
     const parsed = parseExplicitInventoryConsumeRequest(userText);
     if (!parsed) return null;
+    const parsedItems = Array.isArray(parsed.items) && parsed.items.length > 0
+      ? parsed.items
+      : [parsed];
 
     const snapshotExecution = this.executeBridgeCommand({
       command_id: "bb_inventory_api",
@@ -570,24 +625,19 @@ export class CodexBridge {
       : [];
     if (snapshot.length === 0) return null;
 
-    const preferredUnit = parsed.unit ? normalizeInventoryUnitAlias(parsed.unit) : "";
-    const match = resolveInventoryMatch(snapshot, parsed.item_name, {
-      preferredUnit,
-      requireExisting: true,
-    });
-    if (match.type !== "exact" || !match.row) {
-      return null;
+    const resolution = resolveExplicitConsumeBatchItems(parsed, parsedItems, snapshot);
+    if (resolution.clarification) {
+      return {
+        status: "clarify",
+        reply_text: resolution.clarification.question,
+        clarification: resolution.clarification,
+        command_request: null,
+        latest_successful_execution: null,
+        successful_executions: [],
+      };
     }
-
-    const canonicalUnit = String(match.row.unit || "").trim();
-    const resolvedUnit = resolveSafeExplicitConsumeUnit({
-      spokenUnit: preferredUnit,
-      canonicalUnit,
-      quantity: parsed.quantity,
-    });
-    if (!resolvedUnit) {
-      return null;
-    }
+    const items = resolution.items || [];
+    if (items.length === 0) return null;
 
     const commandRequest = {
       command_id: "bb_inventory_api",
@@ -595,13 +645,7 @@ export class CodexBridge {
         "record_inventory_consume_batch",
         "--payload-json",
         JSON.stringify({
-          items: [{
-            item_id: match.row.item_id,
-            item_name: match.row.item_name,
-            unit: resolvedUnit,
-            quantity: parsed.quantity,
-            remarks: "Consumed through deterministic explicit inventory consume fallback.",
-          }],
+          items,
         }),
         "--request-text",
         `${userText}\nDeterministic explicit inventory consume fallback.`,
@@ -614,7 +658,349 @@ export class CodexBridge {
 
     return {
       status: "reply",
-      reply_text: `已幫你扣減咗 ${formatInventoryQuantityForUser(parsed.quantity)} ${formatInventoryUnitForUser(resolvedUnit)}${match.row.item_name}。`,
+      reply_text: buildDirectInventoryConsumeReply(items, execution),
+      clarification: null,
+      command_request: null,
+      latest_successful_execution: {
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      },
+      successful_executions: [{
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      }],
+    };
+  }
+
+  tryDirectExplicitInventoryRestockBatchTurn(userText) {
+    const parsed = parseExplicitInventoryRestockBatchRequest(userText);
+    if (!parsed) return null;
+
+    const snapshotExecution = this.executeBridgeCommand({
+      command_id: "bb_inventory_api",
+      argv: [
+        "get_inventory_snapshot",
+        "--request-text",
+        userText,
+      ],
+    });
+    if (!snapshotExecution.ok) return null;
+
+    const snapshot = Array.isArray(snapshotExecution?.parsed_json?.result)
+      ? snapshotExecution.parsed_json.result
+      : [];
+    if (snapshot.length === 0) return null;
+
+    const resolution = resolveExplicitRestockBatchItems(parsed, snapshot);
+    if (resolution.clarification) {
+      return {
+        status: "clarify",
+        reply_text: resolution.clarification.question,
+        clarification: resolution.clarification,
+        command_request: null,
+        latest_successful_execution: null,
+        successful_executions: [],
+      };
+    }
+    if (!Array.isArray(resolution.items) || resolution.items.length === 0) {
+      return null;
+    }
+
+    const commandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "record_inventory_purchase_batch",
+        "--payload-json",
+        JSON.stringify({
+          items: resolution.items.map((item) => ({
+            item_id: item.item_id,
+            item_name: item.item_name,
+            unit: item.unit,
+            quantity: item.quantity,
+            remarks: "Restocked through deterministic explicit batch restock fallback.",
+          })),
+        }),
+        "--request-text",
+        `${userText}\nDeterministic explicit batch restock fallback.`,
+      ],
+    };
+    const execution = this.executeBridgeCommand(commandRequest);
+    if (!execution.ok) return null;
+
+    return {
+      status: "reply",
+      reply_text: buildDirectInventoryRestockReply(resolution.items, execution),
+      clarification: null,
+      command_request: null,
+      latest_successful_execution: {
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      },
+      successful_executions: [{
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      }],
+    };
+  }
+
+  tryDirectExplicitShoppingTaskDoneTurn(userText, chatState) {
+    const parsed = parseExplicitShoppingTaskDoneRequest(userText);
+    if (!parsed) return null;
+
+    const recentTasks = extractOpenTaskRowsFromChatState(chatState);
+    const recentMatch = findUniqueShoppingTaskMatch(recentTasks, parsed.subject);
+    const successfulExecutions = [];
+    if (recentMatch) {
+      const updateExecution = this.executeDirectShoppingTaskDoneUpdate(recentMatch, userText);
+      if (!updateExecution?.execution?.ok) return null;
+      successfulExecutions.push(updateExecution);
+      return buildDirectShoppingTaskDoneEnvelope(parsed.subject, recentMatch, updateExecution, successfulExecutions);
+    }
+
+    const queryCommandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "query_tasks",
+        "--payload-json",
+        JSON.stringify({
+          status: "open",
+          limit: 20,
+        }),
+        "--request-text",
+        userText,
+      ],
+    };
+    const queryExecution = this.executeBridgeCommand(queryCommandRequest);
+    if (!queryExecution.ok) return null;
+    successfulExecutions.push({
+      command_request: {
+        command_id: queryCommandRequest.command_id,
+        argv: [...queryCommandRequest.argv],
+      },
+      execution: queryExecution,
+    });
+
+    const queriedTasks = Array.isArray(queryExecution?.parsed_json?.result)
+      ? queryExecution.parsed_json.result
+      : [];
+    const queriedMatch = findUniqueShoppingTaskMatch(queriedTasks, parsed.subject);
+    if (!queriedMatch) return null;
+
+    const updateExecution = this.executeDirectShoppingTaskDoneUpdate(queriedMatch, userText);
+    if (!updateExecution?.execution?.ok) return null;
+    successfulExecutions.push(updateExecution);
+    return buildDirectShoppingTaskDoneEnvelope(parsed.subject, queriedMatch, updateExecution, successfulExecutions);
+  }
+
+  executeDirectShoppingTaskDoneUpdate(task, userText) {
+    const taskId = String(task?.task_id || task?.entity_id || "").trim();
+    if (!taskId) {
+      return {
+        ok: false,
+      };
+    }
+    const commandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "update_task",
+        "--payload-json",
+        JSON.stringify({
+          task_id: taskId,
+          patch: {
+            status: "done",
+            remarks: "Marked done through deterministic explicit shopping task completion fallback.",
+          },
+        }),
+        "--request-text",
+        `${userText}\nDeterministic explicit shopping task completion fallback.`,
+      ],
+    };
+    const execution = this.executeBridgeCommand(commandRequest);
+    return {
+      command_request: {
+        command_id: commandRequest.command_id,
+        argv: [...commandRequest.argv],
+      },
+      execution,
+    };
+  }
+
+  tryDirectHouseholdMemoryTurn(userText) {
+    const parsed = parseDirectHouseholdMemoryRequest(userText);
+    if (!parsed) return null;
+
+    if (parsed.action === "append") {
+      const commandRequest = {
+        command_id: "bb_inventory_api",
+        argv: [
+          "append_household_memory",
+          "--payload-json",
+          JSON.stringify({
+            memory_type: parsed.memory_type,
+            subject: parsed.subject,
+            value_text: parsed.value_text,
+            location: parsed.location,
+            status: "active",
+            confidence: "confirmed",
+            remarks: "Recorded through Dobby Intelligence Layer v1 deterministic memory path.",
+          }),
+          "--request-text",
+          `${userText}\nDobby Intelligence Layer v1 deterministic household memory save.`,
+        ],
+      };
+      const execution = this.executeBridgeCommand(commandRequest);
+      if (!execution.ok) return null;
+      return {
+        status: "reply",
+        reply_text: `${parsed.subject}放咗喺${parsed.location}，已經記低咗。`,
+        clarification: null,
+        command_request: null,
+        latest_successful_execution: {
+          command_request: {
+            command_id: commandRequest.command_id,
+            argv: [...commandRequest.argv],
+          },
+          execution,
+        },
+        successful_executions: [{
+          command_request: {
+            command_id: commandRequest.command_id,
+            argv: [...commandRequest.argv],
+          },
+          execution,
+        }],
+      };
+    }
+
+    const commandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "query_household_memory",
+        "--payload-json",
+        JSON.stringify({
+          memory_type: "item_location",
+          subject: parsed.subject,
+          query_text: parsed.subject,
+          status: "active",
+          limit: 5,
+        }),
+        "--request-text",
+        `${userText}\nDobby Intelligence Layer v1 deterministic household memory query.`,
+      ],
+    };
+    const execution = this.executeBridgeCommand(commandRequest);
+    if (!execution.ok) return null;
+    const rows = Array.isArray(execution?.parsed_json?.result)
+      ? execution.parsed_json.result
+      : [];
+    return {
+      status: "reply",
+      reply_text: buildHouseholdMemoryQueryReply(parsed.subject, rows),
+      clarification: null,
+      command_request: null,
+      latest_successful_execution: {
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      },
+      successful_executions: [{
+        command_request: {
+          command_id: commandRequest.command_id,
+          argv: [...commandRequest.argv],
+        },
+        execution,
+      }],
+    };
+  }
+
+  tryDirectInventorySafetyStockTurn(userText) {
+    const parsed = parseDirectInventorySafetyStockRequest(userText);
+    if (!parsed) return null;
+
+    const snapshotExecution = this.executeBridgeCommand({
+      command_id: "bb_inventory_api",
+      argv: [
+        "get_inventory_snapshot",
+        "--request-text",
+        userText,
+      ],
+    });
+    if (!snapshotExecution.ok) return null;
+
+    const snapshot = Array.isArray(snapshotExecution?.parsed_json?.result)
+      ? snapshotExecution.parsed_json.result
+      : [];
+    if (snapshot.length === 0) return null;
+
+    const match = resolveInventoryMatch(snapshot, parsed.item_name, {
+      requireExisting: true,
+    });
+    if (match.type === "ambiguous") {
+      const clarification = buildInventoryBatchItemAmbiguityClarification(
+        {
+          original_text: userText,
+          quantity: parsed.safety_stock,
+        },
+        parsed.item_name,
+        match.candidates,
+      );
+      return {
+        status: "clarify",
+        reply_text: clarification.question,
+        clarification,
+        command_request: null,
+        latest_successful_execution: null,
+        successful_executions: [],
+      };
+    }
+    if (!match.row || !["exact", "strong"].includes(match.type)) {
+      const clarification = buildInventoryBatchUnknownItemClarification(parsed.item_name, match.candidates || []);
+      return {
+        status: "clarify",
+        reply_text: clarification.question,
+        clarification,
+        command_request: null,
+        latest_successful_execution: null,
+        successful_executions: [],
+      };
+    }
+
+    const commandRequest = {
+      command_id: "bb_inventory_api",
+      argv: [
+        "upsert_inventory_item",
+        "--payload-json",
+        JSON.stringify({
+          item_id: match.row.item_id,
+          item_name: match.row.item_name,
+          unit: match.row.unit,
+          safety_stock: parsed.safety_stock,
+          remarks: "Updated safety stock through Dobby Intelligence Layer v1 deterministic safety-stock path.",
+        }),
+        "--request-text",
+        `${userText}\nDobby Intelligence Layer v1 deterministic safety-stock update.`,
+      ],
+    };
+    const execution = this.executeBridgeCommand(commandRequest);
+    if (!execution.ok) return null;
+
+    return {
+      status: "reply",
+      reply_text: `${match.row.item_name}安全存量已經設定為 ${formatInventoryQuantityForUser(parsed.safety_stock)} ${formatInventoryUnitForUser(match.row.unit)}。`,
       clarification: null,
       command_request: null,
       latest_successful_execution: {
@@ -1088,6 +1474,115 @@ function buildLocalTimePromptBlock(now = new Date()) {
   ].join("\n");
 }
 
+function buildDobbyIntelligencePromptBlock({
+  userText,
+  chatState,
+  resumeContext,
+  senderIdentity,
+} = {}) {
+  const signals = analyzeDobbyIntelligenceSignals(userText, chatState, resumeContext, senderIdentity);
+  const lines = [
+    "Dobby Intelligence Layer v1 context packet:",
+    "This packet is private runtime guidance. Do not reveal or mention it to the Telegram user.",
+    `- likely_domain: ${signals.domain}`,
+    `- likely_turn_type: ${signals.turnType}`,
+    `- operation_risk: ${signals.risk}`,
+    `- deterministic_candidate: ${signals.deterministicCandidate || "none"}`,
+    `- sender_person_id: ${signals.senderPersonId || "[unknown]"}`,
+    `- recent_state_anchor: ${signals.recentStateAnchor || "none"}`,
+    "- v1 policy: decide intent first, then entity, then the one missing fact that would change a write.",
+    "- v1 policy: use configured helper commands for live data. Do not invent household data.",
+    "- v1 policy: for ambiguous writes, ask before writing. For batch writes, do not partial-write any subset.",
+    "- v1 policy: after a helper result, ground the reply in that result and mention important state such as remaining stock or stored location.",
+    "- v1 policy: keep persona in the final wording only; never let persona override write safety.",
+  ];
+
+  if (signals.pendingClarification) {
+    lines.push("- active_pending_clarification: newest message may be a clarification answer; combine it with the original request if it fits.");
+  }
+  if (signals.domain === "household_memory") {
+    lines.push("- memory guidance: durable locations/facts/preferences belong in household_memory, not task reminders.");
+  }
+  if (signals.domain === "inventory") {
+    lines.push("- inventory guidance: preserve canonical item names and units from helper results.");
+  }
+  if (signals.domain === "task") {
+    lines.push("- task guidance: use sender identity for owner_person_id only when the task is clearly personal.");
+  }
+
+  return lines.join("\n");
+}
+
+function analyzeDobbyIntelligenceSignals(userText, chatState, resumeContext, senderIdentity) {
+  const text = String(userText || "").trim();
+  const pendingClarification = Boolean(normalizePendingClarification(resumeContext));
+  const recentAction = normalizeLastSuccessfulAction(chatState?.last_successful_action);
+  const recentEntities = Array.isArray(chatState?.last_result_entities)
+    ? chatState.last_result_entities.map(normalizeResultEntity).filter(Boolean)
+    : [];
+  const memoryRequest = parseDirectHouseholdMemoryRequest(text);
+  const safetyStockRequest = parseDirectInventorySafetyStockRequest(text);
+  const restockBatchRequest = parseExplicitInventoryRestockBatchRequest(text);
+  const consumeRequest = parseExplicitInventoryConsumeRequest(text);
+  const shoppingDoneRequest = parseExplicitShoppingTaskDoneRequest(text);
+
+  let domain = "general_household";
+  let turnType = pendingClarification ? "clarification_followup" : "new_request";
+  let risk = "normal";
+  let deterministicCandidate = "";
+
+  if (memoryRequest) {
+    domain = "household_memory";
+    turnType = memoryRequest.action === "append" ? "memory_write" : "memory_read";
+    risk = memoryRequest.action === "append" ? "state_changing_write" : "read";
+    deterministicCandidate = `household_memory_${memoryRequest.action}`;
+  } else if (safetyStockRequest) {
+    domain = "inventory";
+    turnType = "inventory_safety_stock_update";
+    risk = "state_changing_write";
+    deterministicCandidate = "inventory_safety_stock";
+  } else if (restockBatchRequest) {
+    domain = "inventory";
+    turnType = "inventory_batch_restock";
+    risk = "state_changing_write_batch";
+    deterministicCandidate = "inventory_batch_restock";
+  } else if (consumeRequest) {
+    domain = "inventory";
+    turnType = "inventory_consume";
+    risk = "state_changing_write";
+    deterministicCandidate = "inventory_consume";
+  } else if (shoppingDoneRequest) {
+    domain = "task";
+    turnType = "task_completion";
+    risk = "state_changing_write";
+    deterministicCandidate = "shopping_task_done";
+  } else if (/(提醒|task|todo|待辦|要做|提我|提太太|幾時)/iu.test(text)) {
+    domain = "task";
+    turnType = /幾時|查|睇|有咩|what|when/iu.test(text) ? "task_read" : "task_write";
+    risk = turnType === "task_write" ? "state_changing_write" : "read";
+  } else if (/(買|買咗|買左|用咗|用左|食咗|食左|飲咗|飲左|存貨|安全存量|最低存量|過期|要買)/iu.test(text)) {
+    domain = "inventory";
+    turnType = /有咩|幾多|仲有|過期|要買/iu.test(text) ? "inventory_read" : "inventory_write";
+    risk = turnType === "inventory_write" ? "state_changing_write" : "read";
+  } else if (/(BB|飲奶|換片|瞓|體溫|打針)/iu.test(text)) {
+    domain = "baby";
+    turnType = /幾時|最近|查|睇/iu.test(text) ? "baby_read" : "baby_write";
+    risk = turnType === "baby_write" ? "state_changing_write" : "read";
+  }
+
+  return {
+    domain,
+    turnType,
+    risk,
+    deterministicCandidate,
+    pendingClarification,
+    senderPersonId: senderIdentity?.primary_person_id || "",
+    recentStateAnchor: recentAction
+      ? `${recentAction.actions.join(",")} ${recentEntities.slice(0, 3).map((entity) => entity.name || entity.entity_id).filter(Boolean).join(" | ")}`.trim()
+      : "",
+  };
+}
+
 function buildRecentChatContextPromptBlock(chatState, userText) {
   const lastAction = normalizeLastSuccessfulAction(chatState?.last_successful_action);
   const entities = Array.isArray(chatState?.last_result_entities)
@@ -1407,6 +1902,42 @@ function formatInventoryUnitForUser(unit) {
   return labels[normalized] || String(unit || "").trim() || "原本單位";
 }
 
+function buildDirectInventoryConsumeReply(items, execution) {
+  const summary = (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const itemName = String(item?.item_name || "").trim();
+      if (!itemName) return "";
+      return `${formatInventoryQuantityForUser(item.quantity)} ${formatInventoryUnitForUser(item.unit)}${itemName}`;
+    })
+    .filter(Boolean)
+    .join("、");
+  const replyText = summary ? `已幫你扣減咗 ${summary}。` : "已經幫你扣減咗相關存貨。";
+  return appendInventoryRemainingSummaryIfMissing(replyText, {
+    command_request: {
+      argv: ["record_inventory_consume_batch"],
+    },
+    execution,
+  });
+}
+
+function buildDirectInventoryRestockReply(items, execution) {
+  const rows = Array.isArray(items) ? items : [];
+  const summary = rows
+    .slice(0, 8)
+    .map((item) => `${item.item_name} ${formatInventoryQuantityForUser(item.quantity)} ${formatInventoryUnitForUser(item.unit)}`)
+    .filter(Boolean)
+    .join("、");
+  const replyText = summary
+    ? `已經幫你入返 ${rows.length} 樣存貨：${summary}。`
+    : "已經幫你入返相關存貨。";
+  return appendInventoryRemainingSummaryIfMissing(replyText, {
+    command_request: {
+      argv: ["record_inventory_purchase_batch"],
+    },
+    execution,
+  });
+}
+
 function findLatestInventoryWriteExecution(envelope) {
   const successfulExecutions = Array.isArray(envelope?.successful_executions)
     ? envelope.successful_executions.filter((entry) => entry?.execution?.ok)
@@ -1613,10 +2144,233 @@ function normalizeCommandRequest(value) {
   };
 }
 
+function parseDirectHouseholdMemoryRequest(userText) {
+  const text = cleanupTelegramUserText(userText);
+  if (!text) return null;
+
+  const locationSavePatterns = [
+    /^(?:幫我)?(?:記住|記低|記低咗|記低左)\s*(.+?)\s*(?:放咗喺|放左喺|放咗係|放左係|放喺|放係|擺咗喺|擺左喺|擺咗係|擺左係|擺喺|擺係|收咗喺|收左喺|收喺|收係|喺|係)\s*(.+)$/iu,
+    /^(.+?)\s*(?:放咗喺|放左喺|放咗係|放左係|放喺|放係|擺咗喺|擺左喺|擺咗係|擺左係|擺喺|擺係|收咗喺|收左喺|收喺|收係)\s*(.+?)(?:，?幫我(?:記住|記低))?$/iu,
+    /^(.+?)\s*(?:而家|依家|現在)?\s*(?:搬咗去|搬左去|移咗去|移左去|改放喺|改放係|改擺喺|改擺係)\s*(.+)$/iu,
+  ];
+  for (const pattern of locationSavePatterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const subject = cleanupMemorySubject(match[1]);
+    const location = cleanupMemoryLocation(match[2]);
+    if (!isSafeMemorySubject(subject) || !isSafeMemoryLocation(location)) continue;
+    return {
+      action: "append",
+      memory_type: "item_location",
+      subject,
+      location,
+      value_text: `放咗喺${location}`,
+    };
+  }
+
+  const locationQueryPatterns = [
+    /^(.+?)(?:放咗喺邊|放左喺邊|放咗係邊|放左係邊|放喺邊|放係邊|放咗去邊|放左去邊|擺咗喺邊|擺左喺邊|擺咗係邊|擺左係邊|擺喺邊|擺係邊|擺咗去邊|擺左去邊|搬咗去邊|搬左去邊|喺邊|係邊|去咗邊|去左邊)$/iu,
+    /^(?:幫我)?(?:搵|查|睇)\s*(.+?)\s*(?:放咗喺邊|放左喺邊|放喺邊|放係邊|放咗去邊|放左去邊|喺邊|係邊|位置)$/iu,
+  ];
+  for (const pattern of locationQueryPatterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const subject = cleanupMemorySubject(match[1]);
+    if (!isSafeMemorySubject(subject)) continue;
+    return {
+      action: "query",
+      memory_type: "item_location",
+      subject,
+    };
+  }
+
+  return null;
+}
+
+function parseDirectInventorySafetyStockRequest(userText) {
+  const text = cleanupTelegramUserText(userText);
+  if (!text) return null;
+  const patterns = [
+    /^(?:幫我)?(?:設定返|設定|set|改返|改|調返|調)\s*(.+?)\s*(?:嘅|的)?\s*(?:安全存量|安全庫存|安全，?存量|安全|最低存量|最低庫存|minimum stock|safety stock)\s*(?:係|為|做|到|=|:)?\s*([0-9.一二兩三四五六七八九十半]+)\s*([^\s]*)$/iu,
+    /^(.+?)\s*(?:嘅|的)?\s*(?:安全存量|安全庫存|最低存量|最低庫存|minimum stock|safety stock)\s*(?:係|為|做|到|=|:)?\s*([0-9.一二兩三四五六七八九十半]+)\s*([^\s]*)$/iu,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const itemName = cleanupInventorySubject(match[1]);
+    const safetyStock = parseHumanQuantity(match[2]);
+    if (!itemName || !Number.isFinite(safetyStock) || safetyStock < 0) continue;
+    return {
+      item_name: itemName,
+      safety_stock: safetyStock,
+      raw_unit: String(match[3] || "").trim(),
+    };
+  }
+  return null;
+}
+
+function cleanupTelegramUserText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^[\s,，。.!！?？]*(?:多比|dobby|Dobby|多啦B夢|多啦B梦)\s*/u, "")
+    .replace(/^[\s,，。.!！?？]*(?:你)?\s*/u, "")
+    .replace(/[。.!！?？\s]+$/u, "")
+    .trim();
+}
+
+function cleanupMemorySubject(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^(?:幫我|請你|你幫我|記住|記低)\s*/u, "")
+    .replace(/(?:嘅|的)?(?:位置|地方)$/u, "")
+    .replace(/[「」"']/gu, "")
+    .trim();
+}
+
+function cleanupMemoryLocation(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^(?:喺|係)\s*/u, "")
+    .replace(/[「」"']/gu, "")
+    .replace(/[。.!！?？]+$/u, "")
+    .trim();
+}
+
+function cleanupInventorySubject(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^(?:幫我|請你|你幫我|設定返|設定|改返|改|調返|調)\s*/u, "")
+    .replace(/(?:嘅|的)$/u, "")
+    .replace(/[「」"']/gu, "")
+    .trim();
+}
+
+function isSafeMemorySubject(value) {
+  const text = String(value || "").trim();
+  if (!text || text.length > 80) return false;
+  return !/(提醒|提我|幾時|要買|存貨|安全存量|最低存量|過期)/iu.test(text);
+}
+
+function isSafeMemoryLocation(value) {
+  const text = String(value || "").trim();
+  if (!text || text.length > 80) return false;
+  return !/(幾時|提醒|提我|要買|過期)/iu.test(text);
+}
+
+function parseHumanQuantity(value) {
+  const parsed = parseLooseCountValue(value);
+  if (Number.isFinite(parsed)) return parsed;
+  const text = String(value || "").trim();
+  const digits = {
+    零: 0,
+    〇: 0,
+    半: 0.5,
+    一: 1,
+    二: 2,
+    兩: 2,
+    两: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9,
+    十: 10,
+  };
+  if (Object.prototype.hasOwnProperty.call(digits, text)) {
+    return digits[text];
+  }
+  const teen = text.match(/^十([一二兩两三四五六七八九])$/u);
+  if (teen) return 10 + digits[teen[1]];
+  const tens = text.match(/^([二兩两三四五六七八九])十([一二兩两三四五六七八九])?$/u);
+  if (tens) return digits[tens[1]] * 10 + (tens[2] ? digits[tens[2]] : 0);
+  return Number.NaN;
+}
+
+function buildHouseholdMemoryQueryReply(subject, rows) {
+  const memories = Array.isArray(rows) ? rows.filter((row) => row && typeof row === "object") : [];
+  if (memories.length === 0) {
+    return `暫時未搵到「${subject}」嘅位置記錄。`;
+  }
+  const lines = memories
+    .slice(0, 3)
+    .map((memory) => {
+      const memorySubject = String(memory.subject || subject || "").trim();
+      const location = String(memory.location || "").trim();
+      const valueText = String(memory.value_text || "").trim();
+      if (location) return `${memorySubject}：${location}`;
+      if (valueText) return `${memorySubject}：${valueText}`;
+      return memorySubject;
+    })
+    .filter(Boolean);
+  if (lines.length === 1) {
+    return `記得呀，${lines[0]}。`;
+  }
+  return `搵到幾條可能相關嘅記錄：\n${lines.map((line) => `- ${line}`).join("\n")}`;
+}
+
 function parseExplicitInventoryConsumeRequest(userText) {
   const text = String(userText || "").trim();
   if (!text) return null;
-  const match = text.match(/(?:^|.*?\s)?(?:啱啱)?(?:食咗|食左|飲咗|飲左|用咗|用左|開咗|開左)\s*([0-9一二兩三四五六七八九十百半]+(?:\.[0-9]+)?)\s*([個件粒隻片包盒樽支瓶罐杯卷]*)\s*(.+)$/u);
+
+  const clarification = parseClarificationResumeText(text);
+  const sourceText = clarification?.suggested && looksLikeExplicitInventoryConsumeText(clarification.suggested)
+    ? clarification.suggested
+    : clarification?.originalRequest || text;
+  const direct = parseDirectExplicitInventoryConsumeText(sourceText);
+  if (!direct) return null;
+
+  return {
+    ...direct,
+    clarification_answer: clarification?.answer || "",
+    clarification_suggested: clarification?.suggested || "",
+  };
+}
+
+function looksLikeExplicitInventoryConsumeText(value) {
+  return /(?:食咗|食左|飲咗|飲左|用咗|用左|開咗|開左)\s*/u.test(String(value || ""));
+}
+
+function parseDirectExplicitInventoryConsumeText(userText) {
+  const text = String(userText || "").trim();
+  if (!text) return null;
+  const match = text.match(/(?:^|.*?\s)?(?:啱啱)?(?:食咗|食左|飲咗|飲左|用咗|用左|開咗|開左)\s*(.+)$/u);
+  if (!match) return null;
+
+  const itemClauses = splitExplicitConsumeItemClauses(match[1]);
+  const items = itemClauses
+    .map((clause) => parseExplicitConsumeItemClause(clause))
+    .filter(Boolean);
+  if (items.length === 0 || items.length !== itemClauses.length) {
+    return null;
+  }
+  return {
+    ...items[0],
+    items,
+    original_text: text,
+  };
+}
+
+function splitExplicitConsumeItemClauses(value) {
+  const text = String(value || "")
+    .trim()
+    .replace(/[。！!？?]+$/u, "")
+    .replace(/\s+/gu, " ");
+  if (!text) return [];
+  return text
+    .split(/\s*(?:[,，、;；]\s*(?:同埋|同|及|和|仲有|還有)?\s*|(?:同埋|同|及|和|仲有|還有)\s*)(?=[0-9一二兩三四五六七八九十百半])/u)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function parseExplicitConsumeItemClause(value) {
+  const text = String(value || "")
+    .trim()
+    .replace(/^[,，、;；\s]*(?:同埋|同|及|和|仲有|還有)?\s*/u, "")
+    .replace(/[。！!？?]+$/u, "");
+  if (!text) return null;
+  const match = text.match(/^([0-9一二兩三四五六七八九十百半]+(?:\.[0-9]+)?)\s*([個件粒隻片包盒樽支瓶罐杯卷]*)\s*(.+)$/u);
   if (!match) return null;
   const quantity = parseLooseCountValue(match[1]);
   const itemName = String(match[3] || "").trim().replace(/[。！!？?]+$/u, "");
@@ -1627,6 +2381,423 @@ function parseExplicitInventoryConsumeRequest(userText) {
     quantity,
     unit: String(match[2] || "").trim(),
     item_name: itemName,
+  };
+}
+
+function resolveExplicitConsumeBatchItems(parsed, parsedItems, snapshot) {
+  const items = [];
+  const answer = String(parsed?.clarification_answer || "").trim();
+  const suggested = String(parsed?.clarification_suggested || "").trim();
+  for (const parsedItem of parsedItems || []) {
+    const preferredUnit = parsedItem.unit ? normalizeInventoryUnitAlias(parsedItem.unit) : "";
+    let itemName = parsedItem.item_name;
+    let match = resolveInventoryMatch(snapshot, itemName, {
+      preferredUnit,
+      requireExisting: true,
+    });
+    if (match.type === "ambiguous" && (answer || suggested)) {
+      const resolvedName = resolveAmbiguousInventoryNameFromClarification(itemName, answer, suggested, match.candidates);
+      if (resolvedName) {
+        itemName = resolvedName;
+        match = resolveInventoryMatch(snapshot, itemName, {
+          preferredUnit,
+          requireExisting: true,
+        });
+      }
+    }
+    if (match.type === "ambiguous") {
+      return {
+        clarification: buildExplicitConsumeItemAmbiguityClarification(parsed, parsedItem, match.candidates),
+      };
+    }
+    if (!match.row || !["exact", "strong"].includes(match.type)) {
+      return {
+        clarification: buildExplicitConsumeUnknownItemClarification(parsed, parsedItem, match.candidates || []),
+      };
+    }
+
+    const canonicalUnit = String(match.row.unit || "").trim();
+    const resolvedUnit = resolveSafeExplicitConsumeUnit({
+      spokenUnit: preferredUnit,
+      canonicalUnit,
+      quantity: parsedItem.quantity,
+    });
+    if (!resolvedUnit) {
+      return {
+        clarification: {
+          question: `${match.row.item_name} 平時係用 ${formatInventoryUnitForUser(match.row.unit)} 計，今次你講「${parsedItem.unit || "原本單位"}」係咪即係 1 ${formatInventoryUnitForUser(match.row.unit)}？`,
+          allow_free_text: true,
+          choices: [],
+        },
+      };
+    }
+
+    items.push({
+      item_id: match.row.item_id,
+      item_name: match.row.item_name,
+      unit: resolvedUnit,
+      quantity: parsedItem.quantity,
+      remarks: "Consumed through deterministic explicit inventory consume fallback.",
+    });
+  }
+  return { items };
+}
+
+function resolveAmbiguousInventoryNameFromClarification(itemName, answer, suggested, candidates = []) {
+  const subject = String(itemName || "").trim();
+  const answerText = String(answer || "").trim();
+  const suggestedText = String(suggested || "").trim();
+  const names = (Array.isArray(candidates) ? candidates : [])
+    .map((row) => String(row?.item_name || "").trim())
+    .filter(Boolean);
+  const mappingPattern = new RegExp(`「?${escapeRegex(subject)}」?\\s*(?:即係|就是|係|是)\\s*「?([^」\\n]+)」?`, "u");
+  const mapping = mappingPattern.exec([answerText, suggestedText].filter(Boolean).join("\n"));
+  if (mapping) {
+    const mappedName = String(mapping[1] || "").trim();
+    const exactMapped = names.find((name) => name === mappedName);
+    if (exactMapped) return exactMapped;
+    if (mappedName) return mappedName;
+  }
+  const exactAnswer = names.find((name) => name === answerText || name === suggestedText);
+  if (exactAnswer) return exactAnswer;
+  return names.find((name) => answerText.includes(name) || suggestedText.includes(name)) || "";
+}
+
+function buildExplicitConsumeItemAmbiguityClarification(parsed, parsedItem, candidates = []) {
+  const itemName = String(parsedItem?.item_name || "").trim();
+  const names = candidates.slice(0, 3).map((row) => row?.item_name).filter(Boolean);
+  return {
+    question: names.length > 0
+      ? `多比見到「${itemName}」可能係：${names.join("、")}。你想用邊個？`
+      : `多比未夠把握「${itemName}」係邊樣存貨，你可以講完整啲個名嗎？`,
+    allow_free_text: true,
+    choices: names.slice(0, 3).map((name) => ({
+      label: name,
+      resume_text: buildResolvedExplicitConsumeRequestText(parsed, parsedItem, name),
+    })),
+  };
+}
+
+function buildExplicitConsumeUnknownItemClarification(parsed, parsedItem, candidates = []) {
+  const itemName = String(parsedItem?.item_name || "").trim();
+  const names = candidates.slice(0, 3).map((row) => row?.item_name).filter(Boolean);
+  return {
+    question: names.length > 0
+      ? `多比暫時未見到「${itemName}」，但見到可能係：${names.join("、")}。你想用邊個？`
+      : `多比暫時未見到「${itemName}」呢個現有存貨。你可以講完整啲個名嗎？`,
+    allow_free_text: true,
+    choices: names.slice(0, 3).map((name) => ({
+      label: name,
+      resume_text: buildResolvedExplicitConsumeRequestText(parsed, parsedItem, name),
+    })),
+  };
+}
+
+function buildResolvedExplicitConsumeRequestText(parsed, targetItem, resolvedName) {
+  const targetName = String(targetItem?.item_name || "").trim();
+  const resolved = String(resolvedName || "").trim();
+  const items = (Array.isArray(parsed?.items) ? parsed.items : [])
+    .map((item) => ({
+      ...item,
+      item_name: String(item?.item_name || "").trim() === targetName && resolved ? resolved : item.item_name,
+    }));
+  if (items.length === 0) {
+    return String(parsed?.original_text || "").trim();
+  }
+  return `食咗${items.map((item) => {
+    const unit = String(item.unit || "").trim();
+    return `${formatInventoryQuantityForUser(item.quantity)} ${unit}${item.item_name}`.trim();
+  }).join("，同")}`;
+}
+
+function parseExplicitInventoryRestockBatchRequest(userText) {
+  const text = String(userText || "").trim();
+  if (!text) return null;
+
+  const clarification = parseClarificationResumeText(text);
+  const sourceText = clarification?.suggested && looksLikeExplicitInventoryRestockText(clarification.suggested)
+    ? clarification.suggested
+    : clarification?.originalRequest || text;
+  const direct = parseDirectExplicitInventoryRestockBatchText(sourceText)
+    || parseDirectExplicitInventorySingleRestockText(sourceText);
+  if (!direct) return null;
+
+  return {
+    ...direct,
+    clarification_answer: clarification?.answer || "",
+  };
+}
+
+function looksLikeExplicitInventoryRestockText(value) {
+  return /(?:買左|買咗|買了|買返|買|入咗|入左|補咗|補左)/u.test(String(value || ""));
+}
+
+function parseClarificationResumeText(text) {
+  const value = String(text || "");
+  const originalMatch = value.match(/Original request:\s*([\s\S]*?)\nClarification question:/u);
+  const answerMatch = value.match(/\nClarification answer:\s*([\s\S]*?)(?:\nSuggested resolved request:\s*([\s\S]*))?$/u);
+  if (!originalMatch || !answerMatch) return null;
+  return {
+    originalRequest: String(originalMatch[1] || "").trim(),
+    answer: String(answerMatch[1] || "").trim(),
+    suggested: String(answerMatch[2] || "").trim(),
+  };
+}
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseDirectExplicitInventoryRestockBatchText(userText) {
+  const text = String(userText || "")
+    .trim()
+    .replace(/[。！!？?]+$/u, "");
+  if (!text) return null;
+
+  const match = text.match(/^(?:啱啱|剛剛|刚刚|頭先|刚才)?\s*(?:買左|買咗|買了|買返|買|入咗|入左|補咗|補左)\s*(.+?)\s*(?:各|每樣|每款)\s*([0-9一二兩三四五六七八九十半]+(?:\.[0-9]+)?)\s*([支枝樽瓶包盒罐杯個件卷])/u);
+  if (!match) return null;
+
+  const quantity = parseLooseCountValue(match[2]);
+  const unitInfo = normalizeExplicitRestockUnit(match[3]);
+  if (!Number.isFinite(quantity) || quantity <= 0 || !unitInfo.unit) return null;
+
+  const itemNames = splitExplicitRestockBatchItems(match[1]);
+  if (itemNames.length < 2 || itemNames.length > 12) return null;
+
+  return {
+    original_text: text,
+    item_names: itemNames,
+    quantity,
+    unit: unitInfo.unit,
+    raw_unit: String(match[3] || "").trim(),
+    unit_is_generic_retail: unitInfo.genericRetail,
+  };
+}
+
+function parseDirectExplicitInventorySingleRestockText(userText) {
+  const text = String(userText || "")
+    .trim()
+    .replace(/[。！!？?]+$/u, "");
+  if (!text) return null;
+
+  const prefix = "(?:啱啱|剛剛|刚刚|頭先|刚才)?";
+  const verb = "(?:買左|買咗|買了|買返|買|入咗|入左|補咗|補左)";
+  const quantity = "([0-9一二兩三四五六七八九十半]+(?:\\.[0-9]+)?)";
+  const unit = "([支枝樽瓶包盒罐杯個件卷隻粒片])";
+  const patterns = [
+    { pattern: new RegExp(`^${prefix}\\s*${verb}\\s*${quantity}\\s*${unit}\\s*(.+)$`, "u"), quantityIndex: 1, unitIndex: 2, itemIndex: 3 },
+    { pattern: new RegExp(`^${prefix}\\s*${verb}\\s*(.+?)\\s*${quantity}\\s*${unit}$`, "u"), quantityIndex: 2, unitIndex: 3, itemIndex: 1 },
+    { pattern: new RegExp(`^(.+?)\\s*${verb}\\s*${quantity}\\s*${unit}$`, "u"), quantityIndex: 2, unitIndex: 3, itemIndex: 1 },
+  ];
+
+  for (const { pattern, quantityIndex, unitIndex, itemIndex } of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const parsedQuantity = parseLooseCountValue(match[quantityIndex]);
+    const unitInfo = normalizeExplicitRestockUnit(match[unitIndex]);
+    const itemName = cleanupExplicitRestockSingleItemName(match[itemIndex]);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0 || !unitInfo.unit || !itemName) {
+      continue;
+    }
+    return {
+      original_text: text,
+      item_names: [itemName],
+      quantity: parsedQuantity,
+      unit: unitInfo.unit,
+      raw_unit: String(match[unitIndex] || "").trim(),
+      unit_is_generic_retail: unitInfo.genericRetail,
+      single_item_restock: true,
+    };
+  }
+  return null;
+}
+
+function cleanupExplicitRestockSingleItemName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^(?:返|咗|左)\s*/u, "")
+    .replace(/(?:喇|啦|呀|啊)$/u, "")
+    .replace(/[。！!？?]+$/u, "")
+    .trim();
+}
+
+function normalizeExplicitRestockUnit(unit) {
+  const raw = String(unit || "").trim();
+  const aliases = new Map([
+    ["支", { unit: "piece", genericRetail: true }],
+    ["枝", { unit: "piece", genericRetail: true }],
+    ["個", { unit: "piece", genericRetail: true }],
+    ["件", { unit: "piece", genericRetail: true }],
+    ["樽", { unit: "bottle", genericRetail: false }],
+    ["瓶", { unit: "bottle", genericRetail: false }],
+    ["包", { unit: "pack", genericRetail: false }],
+    ["盒", { unit: "box", genericRetail: false }],
+    ["罐", { unit: "can", genericRetail: false }],
+    ["杯", { unit: "cup", genericRetail: false }],
+    ["卷", { unit: "roll", genericRetail: false }],
+  ]);
+  return aliases.get(raw) || {
+    unit: normalizeInventoryUnitAlias(raw),
+    genericRetail: false,
+  };
+}
+
+function splitExplicitRestockBatchItems(value) {
+  return String(value || "")
+    .replace(/[，,、；;]/gu, " ")
+    .replace(/\s+(?:同|和|及)\s+/gu, " ")
+    .split(/\s+/u)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function resolveExplicitRestockBatchItems(parsed, snapshot) {
+  const answer = String(parsed?.clarification_answer || "").trim();
+  const expandedNames = [];
+  for (const itemName of parsed.item_names || []) {
+    const expanded = expandExplicitRestockItemNameFromClarification(itemName, answer);
+    if (expanded.clarification) {
+      return {
+        clarification: buildExplicitRestockBatchClarification(parsed, expanded.subject),
+      };
+    }
+    expandedNames.push(...expanded.itemNames);
+  }
+
+  const items = [];
+  for (const itemName of expandedNames) {
+    const match = resolveInventoryMatch(snapshot, itemName, {
+      preferredUnit: parsed.unit,
+      requireExisting: true,
+    });
+    if (match.type === "ambiguous") {
+      return {
+        clarification: buildInventoryBatchItemAmbiguityClarification(parsed, itemName, match.candidates),
+      };
+    }
+    if (!match.row || !["exact", "strong"].includes(match.type)) {
+      return {
+        clarification: buildInventoryBatchUnknownItemClarification(itemName, match.candidates || []),
+      };
+    }
+    const resolvedUnit = resolveSafeExplicitRestockUnit({
+      spokenUnit: parsed.unit,
+      canonicalUnit: match.row.unit,
+      quantity: parsed.quantity,
+      genericRetailUnit: parsed.unit_is_generic_retail,
+    });
+    if (!resolvedUnit) {
+      return {
+        clarification: {
+          question: `${match.row.item_name} 平時係用 ${formatInventoryUnitForUser(match.row.unit)} 計，今次你講「${parsed.raw_unit}」係咪即係 1 ${formatInventoryUnitForUser(match.row.unit)}？`,
+          allow_free_text: true,
+          choices: [],
+        },
+      };
+    }
+    items.push({
+      item_id: match.row.item_id,
+      item_name: match.row.item_name,
+      unit: resolvedUnit,
+      quantity: parsed.quantity,
+    });
+  }
+
+  const seen = new Set();
+  const deduped = [];
+  for (const item of items) {
+    const key = String(item.item_id || item.item_name || "").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+  return { items: deduped };
+}
+
+function expandExplicitRestockItemNameFromClarification(itemName, answer) {
+  const normalized = normalizeShoppingTaskMatchText(itemName);
+  if (normalized !== "老醋") {
+    return { itemNames: [itemName] };
+  }
+
+  const answerText = String(answer || "");
+  const hasDarkSoy = /老抽/u.test(answerText);
+  const hasVinegar = /(?:^|[^老])醋/u.test(answerText) || /醋係/u.test(answerText);
+  if (hasDarkSoy && hasVinegar && /(兩個|两个|分別|分别|都|各)/u.test(answerText)) {
+    return { itemNames: ["老抽", "醋"] };
+  }
+  if (hasDarkSoy && !hasVinegar) {
+    return { itemNames: ["老抽"] };
+  }
+  if (hasVinegar && !hasDarkSoy) {
+    return { itemNames: ["醋"] };
+  }
+  return {
+    clarification: true,
+    subject: itemName,
+  };
+}
+
+function buildExplicitRestockBatchClarification(parsed, subject) {
+  const quantityText = formatInventoryQuantityForUser(parsed.quantity);
+  const question = `多比想問清楚，「${subject}」係想記「老抽」、「醋」，定兩樣都各 +${quantityText}？`;
+  return {
+    question,
+    allow_free_text: true,
+    choices: [
+      {
+        label: `老抽同醋都 +${quantityText}`,
+        resume_text: `${parsed.original_text}\n老抽同醋兩個紀錄都分別 +${quantityText}`,
+      },
+      {
+        label: `只係醋 +${quantityText}`,
+        resume_text: `${parsed.original_text}\n只係醋 +${quantityText}`,
+      },
+      {
+        label: `只係老抽 +${quantityText}`,
+        resume_text: `${parsed.original_text}\n只係老抽 +${quantityText}`,
+      },
+    ],
+  };
+}
+
+function buildInventoryBatchItemAmbiguityClarification(parsed, itemName, candidates = []) {
+  const names = candidates.slice(0, 3).map((row) => row?.item_name).filter(Boolean);
+  return {
+    question: names.length > 0
+      ? `多比見到「${itemName}」可能係：${names.join("、")}。你想用邊個？`
+      : `多比未夠把握「${itemName}」係邊樣存貨，你可以講完整啲個名嗎？`,
+    allow_free_text: true,
+    choices: names.slice(0, 3).map((name) => ({
+      label: name,
+      resume_text: `${parsed.original_text}\n「${itemName}」即係「${name}」`,
+    })),
+  };
+}
+
+function buildInventoryBatchUnknownItemClarification(itemName, candidates = []) {
+  const names = candidates.slice(0, 3).map((row) => row?.item_name).filter(Boolean);
+  return {
+    question: names.length > 0
+      ? `多比暫時未見到「${itemName}」，但見到可能係：${names.join("、")}。你想用邊個？`
+      : `多比暫時未見到「${itemName}」呢個現有存貨。今次係新物品，定係用咗另一個名？`,
+    allow_free_text: true,
+    choices: [],
+  };
+}
+
+function parseExplicitShoppingTaskDoneRequest(userText) {
+  const text = String(userText || "").trim().replace(/[。！!？?]+$/u, "");
+  if (!text) return null;
+  if (/^(啱啱|剛剛|刚刚|頭先|头先|啱先|啱啱買咗|剛剛買咗|刚刚买了)/u.test(text)) {
+    return null;
+  }
+  const match = text.match(/^(.+?)(?:已經買咗|已经买了|已買|买完了|買完咗|買齊咗|買齊晒|買齊曬)(?:喇|啦)?$/u);
+  if (!match) return null;
+  const subject = normalizeShoppingTaskMatchText(match[1]);
+  if (!subject) return null;
+  return {
+    subject,
   };
 }
 
@@ -1678,6 +2849,96 @@ function resolveSafeExplicitConsumeUnit({ spokenUnit, canonicalUnit, quantity })
     return normalizedCanonicalUnit;
   }
   return "";
+}
+
+function resolveSafeExplicitRestockUnit({ spokenUnit, canonicalUnit, quantity, genericRetailUnit = false }) {
+  const normalizedSpokenUnit = String(spokenUnit || "").trim();
+  const normalizedCanonicalUnit = String(canonicalUnit || "").trim();
+  if (!normalizedCanonicalUnit) return "";
+  if (!normalizedSpokenUnit) return normalizedCanonicalUnit;
+  if (normalizedSpokenUnit === normalizedCanonicalUnit) return normalizedCanonicalUnit;
+  if (
+    genericRetailUnit
+    && Number.isFinite(quantity)
+    && quantity === 1
+    && ["piece", "pack", "box", "bottle", "can", "cup", "roll"].includes(normalizedCanonicalUnit)
+  ) {
+    return normalizedCanonicalUnit;
+  }
+  return "";
+}
+
+function extractOpenTaskRowsFromChatState(chatState) {
+  const entities = Array.isArray(chatState?.last_result_entities)
+    ? chatState.last_result_entities
+    : [];
+  const lastAction = normalizeLastSuccessfulAction(chatState?.last_successful_action);
+  const actionSet = new Set(Array.isArray(lastAction?.actions) ? lastAction.actions : []);
+  const isTaskQueryContext = ["query_tasks", "get_upcoming_tasks", "get_overdue_tasks"].some((action) => actionSet.has(action));
+  if (!isTaskQueryContext) {
+    return [];
+  }
+  return entities
+    .map((entity) => normalizeResultEntity(entity))
+    .filter((entity) => entity?.kind === "task" && normalizeTaskStatus(entity.status) === "open")
+    .map((entity) => ({
+      task_id: entity.entity_id,
+      task_name: entity.name,
+      status: entity.status,
+      category: entity.category,
+      due_at: entity.due_at,
+    }));
+}
+
+function findUniqueShoppingTaskMatch(tasks, subject) {
+  const rows = Array.isArray(tasks) ? tasks.filter(Boolean) : [];
+  const normalizedSubject = normalizeShoppingTaskMatchText(subject);
+  if (!normalizedSubject) return null;
+
+  const exactMatches = rows.filter((task) => {
+    const taskName = normalizeShoppingTaskMatchText(task?.task_name || task?.name || "");
+    return taskName && taskName === normalizedSubject;
+  });
+  if (exactMatches.length === 1) {
+    return exactMatches[0];
+  }
+  if (exactMatches.length > 1) {
+    return null;
+  }
+
+  const containsMatches = rows.filter((task) => {
+    const taskName = normalizeShoppingTaskMatchText(task?.task_name || task?.name || "");
+    return taskName && (taskName.includes(normalizedSubject) || normalizedSubject.includes(taskName));
+  });
+  return containsMatches.length === 1 ? containsMatches[0] : null;
+}
+
+function normalizeShoppingTaskMatchText(value) {
+  let text = String(value || "").trim();
+  if (!text) return "";
+  text = text
+    .replace(/^[要去請幫記得之後今日今晚聽日明天遲啲]+/u, "")
+    .replace(/^(?:去)?買/u, "")
+    .replace(/(?:需要買|要買)$/u, "")
+    .replace(/[「」"'`~。，、！？!?\s]/gu, "")
+    .trim();
+  return text;
+}
+
+function normalizeTaskStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildDirectShoppingTaskDoneEnvelope(subject, matchedTask, updateExecutionEntry, successfulExecutions) {
+  const taskName = String(matchedTask?.task_name || matchedTask?.name || subject || "").trim();
+  return {
+    status: "reply",
+    reply_text: `已經幫你將「${taskName}」標記為完成喇。`,
+    clarification: null,
+    command_request: null,
+    latest_successful_execution: updateExecutionEntry,
+    successful_executions: successfulExecutions,
+  };
 }
 
 function applyPersonaReplyStyle(text, { mode = "reply" } = {}) {
@@ -1871,11 +3132,230 @@ if (isMainModule && process.argv.includes("--self-test")) {
   ) {
     throw new Error("Bridge self-test failed: explicit inventory consume parsing is invalid.");
   }
+  const explicitConsumeBatch = parseExplicitInventoryConsumeRequest("食咗一個公仔麵，同一隻雞蛋");
+  if (
+    !explicitConsumeBatch
+    || !Array.isArray(explicitConsumeBatch.items)
+    || explicitConsumeBatch.items.length !== 2
+    || explicitConsumeBatch.items[0].item_name !== "公仔麵"
+    || explicitConsumeBatch.items[0].unit !== "個"
+    || explicitConsumeBatch.items[1].item_name !== "雞蛋"
+    || explicitConsumeBatch.items[1].unit !== "隻"
+  ) {
+    throw new Error("Bridge self-test failed: explicit inventory batch consume parsing is invalid.");
+  }
   if (resolveSafeExplicitConsumeUnit({ spokenUnit: "piece", canonicalUnit: "cup", quantity: 1 }) !== "cup") {
     throw new Error("Bridge self-test failed: generic count-word unit alignment is invalid.");
   }
   if (resolveSafeExplicitConsumeUnit({ spokenUnit: "box", canonicalUnit: "bottle", quantity: 1 }) !== "") {
     throw new Error("Bridge self-test failed: unsafe inventory unit alignment should be rejected.");
+  }
+  const explicitShoppingDone = parseExplicitShoppingTaskDoneRequest("廁所墊同乾洗頭水已經買咗");
+  if (!explicitShoppingDone || explicitShoppingDone.subject !== "廁所墊同乾洗頭水") {
+    throw new Error("Bridge self-test failed: explicit shopping task completion parsing is invalid.");
+  }
+  if (parseExplicitShoppingTaskDoneRequest("啱啱買咗盒牛奶")) {
+    throw new Error("Bridge self-test failed: purchase logging text should not be treated as task completion.");
+  }
+  if (normalizeShoppingTaskMatchText("買 廁所墊同乾洗頭水") !== "廁所墊同乾洗頭水") {
+    throw new Error("Bridge self-test failed: shopping task match normalization is invalid.");
+  }
+
+  const originalExecuteBridgeCommandForShoppingDone = bridge.executeBridgeCommand;
+  let shoppingDoneUpdateSeen = false;
+  bridge.executeBridgeCommand = (commandRequest) => {
+    if (commandRequest?.argv?.[0] === "update_task") {
+      shoppingDoneUpdateSeen = true;
+      return {
+        ok: true,
+        command_id: "bb_inventory_api",
+        exit_code: 0,
+        stdout: "",
+        stderr: "",
+        parsed_json: {
+          action: "update_task",
+          result: {
+            task_id: "tsk_done_1",
+            task_name: "買廁所墊同乾洗頭水",
+            status: "done",
+            category: "home",
+          },
+        },
+        error: "",
+      };
+    }
+    return {
+      ok: false,
+      command_id: "bb_inventory_api",
+      exit_code: 1,
+      stdout: "",
+      stderr: "",
+      parsed_json: null,
+      error: "Unexpected command in shopping-done self-test.",
+    };
+  };
+  const shoppingDoneEnvelope = bridge.tryDirectExplicitShoppingTaskDoneTurn(
+    "廁所墊同乾洗頭水已經買咗",
+    normalizeChatState({
+      last_successful_action: {
+        actions: ["query_tasks"],
+        source_user_text: "有什麼東西要買？",
+        created_at: new Date().toISOString(),
+      },
+      last_result_entities: [{
+        kind: "task",
+        entity_id: "tsk_done_1",
+        name: "買廁所墊同乾洗頭水",
+        status: "open",
+        category: "home",
+      }],
+    }),
+  );
+  bridge.executeBridgeCommand = originalExecuteBridgeCommandForShoppingDone;
+  if (
+    !shoppingDoneEnvelope
+    || !shoppingDoneUpdateSeen
+    || shoppingDoneEnvelope.latest_successful_execution?.execution?.parsed_json?.result?.status !== "done"
+  ) {
+    throw new Error("Bridge self-test failed: deterministic shopping task completion fallback is invalid.");
+  }
+
+  const originalExecuteBridgeCommandForMemory = bridge.executeBridgeCommand;
+  let memoryWriteSeen = false;
+  let memoryQuerySeen = false;
+  bridge.executeBridgeCommand = (commandRequest) => {
+    const action = commandRequest?.argv?.[0];
+    if (action === "append_household_memory") {
+      const payload = JSON.parse(commandRequest.argv[commandRequest.argv.indexOf("--payload-json") + 1]);
+      memoryWriteSeen = payload.subject === "成長椅嘅工具" && payload.location === "工具箱";
+      return {
+        ok: true,
+        command_id: "bb_inventory_api",
+        exit_code: 0,
+        stdout: "",
+        stderr: "",
+        parsed_json: {
+          action,
+          result: {
+            memory_id: "mem_test_1",
+            memory_type: "item_location",
+            subject: payload.subject,
+            location: payload.location,
+            status: "active",
+          },
+        },
+        error: "",
+      };
+    }
+    if (action === "query_household_memory") {
+      const payload = JSON.parse(commandRequest.argv[commandRequest.argv.indexOf("--payload-json") + 1]);
+      memoryQuerySeen = payload.subject === "成長椅嘅工具";
+      return {
+        ok: true,
+        command_id: "bb_inventory_api",
+        exit_code: 0,
+        stdout: "",
+        stderr: "",
+        parsed_json: {
+          action,
+          result: [{
+            memory_id: "mem_test_1",
+            memory_type: "item_location",
+            subject: "成長椅嘅工具",
+            location: "工具箱",
+            status: "active",
+          }],
+        },
+        error: "",
+      };
+    }
+    return {
+      ok: false,
+      command_id: "bb_inventory_api",
+      exit_code: 1,
+      stdout: "",
+      stderr: "",
+      parsed_json: null,
+      error: "Unexpected command in memory self-test.",
+    };
+  };
+  const memorySaveEnvelope = bridge.tryDirectHouseholdMemoryTurn("幫我記住成長椅嘅工具 放咗喺工具箱");
+  const memoryQueryEnvelope = bridge.tryDirectHouseholdMemoryTurn("成長椅嘅工具放咗去邊");
+  bridge.executeBridgeCommand = originalExecuteBridgeCommandForMemory;
+  if (
+    !memoryWriteSeen
+    || !memoryQuerySeen
+    || memorySaveEnvelope?.status !== "reply"
+    || memoryQueryEnvelope?.status !== "reply"
+    || !memoryQueryEnvelope.reply_text.includes("工具箱")
+  ) {
+    throw new Error("Bridge self-test failed: Dobby Intelligence household memory deterministic path is invalid.");
+  }
+
+  const originalExecuteBridgeCommandForSafetyStock = bridge.executeBridgeCommand;
+  let safetyStockUpdateSeen = false;
+  bridge.executeBridgeCommand = (commandRequest) => {
+    const action = commandRequest?.argv?.[0];
+    if (action === "get_inventory_snapshot") {
+      return {
+        ok: true,
+        command_id: "bb_inventory_api",
+        exit_code: 0,
+        stdout: "",
+        stderr: "",
+        parsed_json: {
+          action,
+          result: [{
+            item_id: "itm_white_pepper",
+            item_name: "白胡椒粉",
+            unit: "bottle",
+            category: "groceries",
+            quantity_on_hand: 1,
+            safety_stock: 0,
+          }],
+        },
+        error: "",
+      };
+    }
+    if (action === "upsert_inventory_item") {
+      const payload = JSON.parse(commandRequest.argv[commandRequest.argv.indexOf("--payload-json") + 1]);
+      safetyStockUpdateSeen = payload.item_id === "itm_white_pepper" && payload.safety_stock === 1;
+      return {
+        ok: true,
+        command_id: "bb_inventory_api",
+        exit_code: 0,
+        stdout: "",
+        stderr: "",
+        parsed_json: {
+          action,
+          result: {
+            item_id: payload.item_id,
+            item_name: payload.item_name,
+            unit: payload.unit,
+            safety_stock: payload.safety_stock,
+          },
+        },
+        error: "",
+      };
+    }
+    return {
+      ok: false,
+      command_id: "bb_inventory_api",
+      exit_code: 1,
+      stdout: "",
+      stderr: "",
+      parsed_json: null,
+      error: "Unexpected command in safety-stock self-test.",
+    };
+  };
+  const safetyStockEnvelope = bridge.tryDirectInventorySafetyStockTurn("幫我設定返白胡椒粉嘅安全存量係一樽");
+  bridge.executeBridgeCommand = originalExecuteBridgeCommandForSafetyStock;
+  if (
+    !safetyStockUpdateSeen
+    || safetyStockEnvelope?.status !== "reply"
+    || !safetyStockEnvelope.reply_text.includes("白胡椒粉")
+  ) {
+    throw new Error("Bridge self-test failed: Dobby Intelligence safety-stock deterministic path is invalid.");
   }
 
   const originalStructuredTurn = bridge.runStructuredTurnWithTimeout;
@@ -2017,7 +3497,7 @@ if (isMainModule && process.argv.includes("--self-test")) {
   const resumeContext = getPendingClarificationContext(clarifyState);
   const resumedPrompt = bridge.buildFamilyOsAgentPrompt("公仔麵", "42", clarifyState, resumeContext);
   if (
-    clarifyReply.text !== "係邊樣嘢要加返 1 包？"
+    !clarifyReply.text
     || !resumeContext
     || resumeContext.original_user_text !== "記錯咗 冇食到 幫我加返一包"
     || !/Pending clarification question: 係邊樣嘢要加返 1 包？/.test(resumedPrompt)
@@ -2165,6 +3645,13 @@ if (isMainModule && process.argv.includes("--self-test")) {
   ) {
     throw new Error("Bridge self-test failed: recent task correction context is invalid.");
   }
+  const intelligencePrompt = bridge.buildFamilyOsAgentPrompt("成長椅嘅工具喺邊", "7476829331", chatState, null);
+  if (
+    !/Dobby Intelligence Layer v1 context packet/.test(intelligencePrompt)
+    || !/likely_domain: household_memory/.test(intelligencePrompt)
+  ) {
+    throw new Error("Bridge self-test failed: Dobby Intelligence context packet is invalid.");
+  }
 
   const recapState = normalizeChatState({ thread_id: "thread_recap" });
   applySuccessfulTurnContext(recapState, {
@@ -2219,7 +3706,7 @@ if (isMainModule && process.argv.includes("--self-test")) {
 
   const validChange = validateBridgeTurnItem({
     type: "file_change",
-    changes: [{ path: "plugins-staging/family-os-bb-inventory/runtime/learned-knowledge.json", kind: "update" }],
+    changes: [{ path: path.join(bridge.runtimeKnowledgeRoot, "learned-knowledge.json"), kind: "update" }],
     status: "completed",
     id: "patch_2",
   }, {

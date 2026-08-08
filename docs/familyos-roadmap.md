@@ -98,12 +98,15 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: audited write pattern with `audit_log`
 - `Planned`: `household_memory` sheet and API actions
 - `Planned`: additive schema governance for future memory extensions
+- `In progress`: BB Google Calendar integration through narrow Apps Script actions with linked task rows
 - `Deferred`: non-Sheets primary database
 
 ### Lane C: Conversation UX
 
 - `Completed`: Telegram bot polling, allowlist, bridge health, callback flow
 - `Completed`: per-instance persona loading
+- `In progress`: BB appointment flows for vaccination, clinic follow-up, doctor visit, and checkup using the configured Google Calendar
+- `Completed`: Dobby Intelligence Layer v1 context packet and deterministic fast paths for clear memory, safety-stock, batch-restock, consume, and shopping-task completion requests
 - `Planned`: household memory phrasing such as "記住 X 喺 Y"
 - `Planned`: semantic retrieval for memory lookups
 
@@ -174,6 +177,9 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - item locations
   - simple household facts
   - explicit user-recorded preferences only if schema is ready
+- Current implementation note:
+  - Dobby Intelligence Layer v1 can deterministically save and query clear item-location memory requests through the existing `append_household_memory` and `query_household_memory` API actions.
+  - Broader fact / preference extraction still uses the runtime skill and is not yet a semantic retrieval system.
 
 ### Phase 7: Skill Governance Hardening
 
@@ -181,11 +187,26 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - Goal:
   - make skill enhancement safer and reviewable
 
-## Immediate Next Milestone
+### Phase 8: BB Google Calendar MVP
 
-The next implementation milestone is `Household Memory MVP`.
+- `In progress`
+- Goal:
+  - let Dobby manage BB future appointments such as vaccinations and clinic follow-ups through the configured household Google Calendar
+- Initial scope:
+  - create future BB calendar events
+  - query upcoming BB calendar events
+  - link created events back to Family OS `tasks` rows so existing reminders still work
+- Current implementation note:
+  - Apps Script requires `FAMILY_OS_BB_CALENDAR_ID` as a Script Property and Calendar OAuth authorization before live use.
 
-### MVP Goal
+## Immediate Next Milestones
+
+The active implementation milestones are:
+
+- `Household Memory MVP`, now building on `Dobby Intelligence Layer v1`
+- `BB Google Calendar MVP`, starting with future BB appointments and linked reminders
+
+### Household Memory MVP Goal
 
 Allow Telegram flows like:
 
@@ -193,7 +214,7 @@ Allow Telegram flows like:
 - `成長椅工具放咗去邊？`
 - `備用門匙而家搬咗去鞋櫃第二格`
 
-### MVP Scope
+### Household Memory MVP Scope
 
 - new Google Sheet: `household_memory`
 - new API actions:

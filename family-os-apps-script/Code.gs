@@ -1,5 +1,6 @@
 const FAMILY_OS = Object.freeze({
   spreadsheetId: PropertiesService.getScriptProperties().getProperty("FAMILY_SHEET_ID"),
+  bbCalendarId: PropertiesService.getScriptProperties().getProperty("FAMILY_OS_BB_CALENDAR_ID"),
   householdId: "hh_home",
   schemaVersion: "family_os_poc_v1",
   timezone: "Asia/Hong_Kong",
@@ -107,6 +108,7 @@ const TASK_CATEGORIES = Object.freeze(["baby", "finance", "home", "helper", "med
 const TASK_PRIORITIES = Object.freeze(["low", "medium", "high", "urgent"]);
 const TASK_STATUSES = Object.freeze(["open", "in_progress", "waiting", "done", "cancelled"]);
 const TASK_RECURRENCES = Object.freeze(["none", "daily", "weekly", "monthly", "quarterly", "yearly", "custom"]);
+const BB_CALENDAR_EVENT_TYPES = Object.freeze(["vaccination", "clinic_visit", "doctor_visit", "checkup", "prenatal_check", "other"]);
 const CAREGIVER_RECORD_TYPES = Object.freeze(["leave", "schedule", "training", "house_rule", "handover", "reminder", "payment_note"]);
 const PROPERTY_STATUSES = Object.freeze(["researched", "to_visit", "visited", "shortlisted", "rejected", "offer_consideration", "archived"]);
 const DOCUMENT_CATEGORIES = Object.freeze(["birth_certificate", "identity_document", "marriage_certificate", "lease", "insurance", "helper_contract", "medical", "bank", "tax", "other"]);
@@ -151,6 +153,8 @@ function route_(action, payload, request) {
       return getMonthlyCashflow_(payload);
     case "get_recent_baby_logs":
       return getRecentBabyLogs_(payload);
+    case "query_bb_calendar_events":
+      return queryBbCalendarEvents_(payload);
     case "get_dashboard_snapshot":
       return getDashboardSnapshot_(payload);
     case "get_telegram_allowlist":
@@ -184,6 +188,10 @@ function route_(action, payload, request) {
     case "append_baby_log":
       return withWriteLock_(function () {
         return appendBabyLog_(payload, request);
+      });
+    case "append_bb_calendar_event":
+      return withWriteLock_(function () {
+        return appendBbCalendarEvent_(payload, request);
       });
     case "record_inventory_movement":
       return withWriteLock_(function () {
@@ -256,6 +264,7 @@ function health_() {
     version: "family_os_api_v3",
     household_id: FAMILY_OS.householdId,
     schema_version: FAMILY_OS.schemaVersion,
+    bb_calendar_configured: Boolean(FAMILY_OS.bbCalendarId),
     timestamp: now_(),
   };
 }
@@ -327,6 +336,187 @@ function getRecentBabyLogs_(payload) {
       "duration_minutes", "remarks",
     ]);
   });
+}
+
+function queryBbCalendarEvents_(payload) {
+  assertAllowedKeys_(payload, ["from", "to", "days", "query_text", "event_type", "limit"], "query_bb_calendar_events");
+  const fromDate = payload.from ? calendarDateFromTimestamp_(payload.from, "from") : new Date();
+  const toDate = payload.to
+    ? calendarDateFromTimestamp_(payload.to, "to")
+    : new Date(fromDate.getTime() + clampNumber_(payload.days || 180, 1, 365) * 86400000);
+  if (toDate <= fromDate) throw new Error("to must be after from.");
+
+  const eventType = payload.event_type
+    ? requireOneOf_(payload.event_type, BB_CALENDAR_EVENT_TYPES, "event_type")
+    : "";
+  const queryText = normalizeCalendarSearchText_(payload.query_text);
+  const limit = clampNumber_(payload.limit || 20, 1, 100);
+
+  return bbCalendar_().getEvents(fromDate, toDate)
+    .filter(function (event) {
+      return calendarEventMatches_(event, eventType, queryText);
+    })
+    .sort(function (left, right) {
+      return left.getStartTime().getTime() - right.getStartTime().getTime();
+    })
+    .slice(0, limit)
+    .map(compactBbCalendarEvent_);
+}
+
+function appendBbCalendarEvent_(payload, request) {
+  assertAllowedKeys_(payload, [
+    "event_type", "title", "start_at", "end_at", "duration_minutes", "location",
+    "description", "owner_person_id", "related_person_id", "priority", "status",
+    "remarks", "create_task",
+  ], "append_bb_calendar_event");
+
+  const eventType = requireOneOf_(payload.event_type || "other", BB_CALENDAR_EVENT_TYPES, "event_type");
+  const title = requireString_(payload.title || defaultBbCalendarTitle_(eventType), "title");
+  const startAt = timestamp_(payload.start_at);
+  const startDate = calendarDateFromTimestamp_(startAt, "start_at");
+  const endDate = payload.end_at
+    ? calendarDateFromTimestamp_(payload.end_at, "end_at")
+    : new Date(startDate.getTime() + clampNumber_(payload.duration_minutes || 60, 5, 1440) * 60000);
+  if (endDate <= startDate) throw new Error("end_at must be after start_at.");
+
+  const location = optionalString_(payload.location);
+  const options = {
+    description: buildBbCalendarDescription_(payload, eventType),
+  };
+  if (location) options.location = location;
+
+  let event = null;
+  let task = null;
+  try {
+    event = bbCalendar_().createEvent(title, startDate, endDate, options);
+    if (payload.create_task === undefined || optionalBoolean_(payload.create_task)) {
+      task = appendTask_(buildBbCalendarTaskPayload_(payload, eventType, title, startAt, event), request);
+    }
+
+    const result = {
+      calendar_event: compactBbCalendarEvent_(event),
+      task: task || null,
+    };
+    appendAudit_("google_calendar", event.getId(), "create_event", {}, result, request);
+    return result;
+  } catch (error) {
+    if (event && !task) {
+      try {
+        event.deleteEvent();
+      } catch (cleanupError) {
+        // Best-effort cleanup only; preserve the original failure for the caller.
+      }
+    }
+    throw error;
+  }
+}
+
+function bbCalendar_() {
+  const calendarId = requireString_(FAMILY_OS.bbCalendarId, "FAMILY_OS_BB_CALENDAR_ID script property");
+  const calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) {
+    throw new Error("BB Google Calendar is not accessible. Check script property and Calendar authorization.");
+  }
+  return calendar;
+}
+
+function calendarDateFromTimestamp_(value, name) {
+  const date = parseDate_(timestamp_(value));
+  if (!date) throw new Error("Invalid " + name + " timestamp.");
+  return date;
+}
+
+function compactBbCalendarEvent_(event) {
+  return {
+    calendar_event_id: event.getId(),
+    title: event.getTitle(),
+    event_type: extractBbCalendarEventType_(event),
+    start_at: formatCalendarTimestamp_(event.getStartTime()),
+    end_at: formatCalendarTimestamp_(event.getEndTime()),
+    location: event.getLocation() || "",
+    description: event.getDescription() || "",
+  };
+}
+
+function buildBbCalendarTaskPayload_(payload, eventType, title, startAt, event) {
+  const relatedPersonId = payload.related_person_id || defaultBbCalendarRelatedPerson_(eventType);
+  const remarks = [
+    optionalString_(payload.remarks),
+    "Google Calendar: BB schedule",
+    "calendar_event_id=" + event.getId(),
+  ].filter(Boolean).join("\n");
+  return {
+    category: bbCalendarTaskCategory_(eventType),
+    task_name: title,
+    description: optionalString_(payload.description),
+    owner_person_id: payload.owner_person_id || "",
+    due_at: startAt,
+    priority: payload.priority || "medium",
+    status: payload.status || "open",
+    recurrence: "none",
+    related_person_id: relatedPersonId,
+    source_type: "google_calendar",
+    source_id: event.getId(),
+    remarks: remarks,
+  };
+}
+
+function buildBbCalendarDescription_(payload, eventType) {
+  const relatedPersonId = payload.related_person_id || defaultBbCalendarRelatedPerson_(eventType);
+  return [
+    optionalString_(payload.description),
+    "Family OS BB calendar event",
+    "family_os_event_type=" + eventType,
+    relatedPersonId ? "family_os_related_person_id=" + relatedPersonId : "",
+    optionalString_(payload.remarks) ? "remarks=" + optionalString_(payload.remarks) : "",
+  ].filter(Boolean).join("\n");
+}
+
+function defaultBbCalendarTitle_(eventType) {
+  const titles = {
+    vaccination: "BB 打針",
+    clinic_visit: "BB 覆診",
+    doctor_visit: "BB 睇醫生",
+    checkup: "BB 檢查",
+    prenatal_check: "產檢",
+    other: "BB 日程",
+  };
+  return titles[eventType] || titles.other;
+}
+
+function defaultBbCalendarRelatedPerson_(eventType) {
+  return eventType === "prenatal_check" ? "per_wife" : "per_baby";
+}
+
+function bbCalendarTaskCategory_(eventType) {
+  return eventType === "other" ? "baby" : "medical";
+}
+
+function extractBbCalendarEventType_(event) {
+  const text = String(event.getDescription() || "");
+  const match = text.match(/family_os_event_type=([a-z_]+)/);
+  return match ? match[1] : "";
+}
+
+function calendarEventMatches_(event, eventType, queryText) {
+  const haystack = normalizeCalendarSearchText_([
+    event.getTitle(),
+    event.getDescription(),
+    event.getLocation(),
+  ].join(" "));
+  if (eventType && haystack.indexOf("family_os_event_type=" + eventType) === -1 && haystack.indexOf(eventType) === -1) {
+    return false;
+  }
+  if (queryText && haystack.indexOf(queryText) === -1) return false;
+  return true;
+}
+
+function normalizeCalendarSearchText_(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function formatCalendarTimestamp_(date) {
+  return Utilities.formatDate(date, FAMILY_OS.timezone, "yyyy-MM-dd HH:mm:ssXXX");
 }
 
 function getDashboardSnapshot_(payload) {

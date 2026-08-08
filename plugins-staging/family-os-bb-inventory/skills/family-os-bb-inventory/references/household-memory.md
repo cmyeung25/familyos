@@ -73,3 +73,14 @@ If there are several likely matches, ask one short clarification.
 - if the stored target object is unclear, ask before writing
 - do not silently overwrite an earlier memory in v1; just append the new memory record
 - if the user sounds like they are correcting a very recent memory write, keep that recent target in mind
+
+## Dobby Intelligence v1 Direct Path
+
+The bridge may directly handle clear item-location save/query phrasing before the LLM turn.
+
+Examples:
+
+- `幫我記住成長椅嘅工具放咗喺工具箱`
+- `成長椅嘅工具喺邊`
+
+The direct path only covers clear item locations. Facts, preferences, corrections, and ambiguous memory requests should still be handled through this skill and the `append_household_memory` / `query_household_memory` helper actions.

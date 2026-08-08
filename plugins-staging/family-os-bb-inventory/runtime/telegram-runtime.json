@@ -55,6 +55,11 @@
       "query_upcoming",
       "query_overdue"
     ],
+    "bb_calendar_capabilities": [
+      "append",
+      "query",
+      "linked_task_reminders"
+    ],
     "household_memory_capabilities": [
       "append",
       "query"

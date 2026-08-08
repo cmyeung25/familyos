@@ -83,10 +83,13 @@ Examples:
 
 ### Future baby schedule
 
-- use `append_task`
+- prefer `append_bb_calendar_event` when the user gives a concrete future BB appointment that should appear in Google Calendar
+- the Calendar API links the appointment back to a Family OS task by default, so the reminder worker can still use the task row
+- use `append_task` only for lightweight future intentions that do not need a calendar event
 - category usually `baby` or `medical`
 - if the user gives a concrete due date, store it
 - if the user only says a future intention without a date, store as open task and ask only if the date is necessary for the user's stated goal
+- use `append_baby_log` for already-happened BB events, not future appointments
 
 ### School / application planning
 

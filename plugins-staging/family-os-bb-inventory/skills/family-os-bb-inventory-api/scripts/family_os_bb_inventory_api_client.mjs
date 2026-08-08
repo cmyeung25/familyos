@@ -18,6 +18,8 @@ const allowedActions = new Set([
   "update_inventory_expiry_date",
   "get_recent_baby_logs",
   "append_baby_log",
+  "query_bb_calendar_events",
+  "append_bb_calendar_event",
   "append_task",
   "update_task",
   "query_tasks",
@@ -45,7 +47,7 @@ function argument(name) {
 
 function readRequest() {
   if (process.argv.includes("--self-test")) {
-    if (!allowedActions.has("append_baby_log") || !allowedActions.has("set_inventory_stock_level") || !allowedActions.has("update_inventory_expiry_date") || !allowedActions.has("append_task") || !allowedActions.has("get_task_context_hints") || !allowedActions.has("append_household_memory") || !allowedActions.has("query_household_memory")) {
+    if (!allowedActions.has("append_baby_log") || !allowedActions.has("set_inventory_stock_level") || !allowedActions.has("update_inventory_expiry_date") || !allowedActions.has("append_task") || !allowedActions.has("query_bb_calendar_events") || !allowedActions.has("append_bb_calendar_event") || !allowedActions.has("get_task_context_hints") || !allowedActions.has("append_household_memory") || !allowedActions.has("query_household_memory")) {
       throw new Error("Allowed action self-test failed.");
     }
     const payload = parsePayloadArgument("{\"log_type\":\"feeding\",\"value_number\":90,\"unit\":\"ml\"}");

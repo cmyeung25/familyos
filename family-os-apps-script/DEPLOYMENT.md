@@ -25,6 +25,7 @@ Optional override:
 | Property | Value |
 | --- | --- |
 | `FAMILY_OS_SPREADSHEET_ID` | `1kyKGz6GuScz3GblIVTq12-L6LqzxAQpBmGZB74nifpc` |
+| `FAMILY_OS_BB_CALENDAR_ID` | the BB Google Calendar ID for this household |
 
 ## Deploy
 
@@ -33,7 +34,7 @@ Optional override:
 3. Enable the manifest file in project settings and replace `appsscript.json`.
 4. In the Family OS workbook, add `telegram_user_id` to the `people` sheet header and fill it for any Telegram users that should be allowlisted.
 5. Add the script property.
-6. Run a function once from the editor and authorize spreadsheet access.
+6. Run a function once from the editor and authorize spreadsheet and Calendar access.
 7. Select `Deploy > New deployment > Web app`.
 8. Execute the app as the owner.
 9. Choose the narrowest access option that still allows the local Codex client to call the endpoint.

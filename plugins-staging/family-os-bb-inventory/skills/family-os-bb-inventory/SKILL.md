@@ -20,6 +20,12 @@ Supported BB log types:
 - `clinic_visit`
 - `doctor_visit`
 
+Supported BB calendar operations:
+
+- add a future BB appointment to the configured Google Calendar
+- query future BB appointments from the configured Google Calendar
+- link created BB calendar appointments back to Family OS tasks for reminders
+
 Supported inventory operations:
 
 - snapshot query
@@ -27,6 +33,7 @@ Supported inventory operations:
 - restock
 - consume
 - set current stock level
+- set safety stock / minimum stock for an existing inventory item
 - update expiry date for an existing inventory item or the most recent purchase
 - new-item bootstrap
 
@@ -135,6 +142,25 @@ For `record_inventory_purchase_batch` and `record_inventory_consume_batch`, alwa
 
 Use `$family-os-bb-inventory-api` for all live BB, inventory, and task reads and writes.
 
+## BB Calendar
+
+Use `append_bb_calendar_event` when the user clearly wants to create a future BB appointment such as 打針, 覆診, 睇醫生, 檢查, or 產檢. Include the concrete date/time in `start_at`; ask one short clarification if the date or time is missing.
+
+Use `query_bb_calendar_events` when the user asks when the next BB appointment, vaccination, clinic visit, doctor visit, or checkup is. Use `append_baby_log` only for already-happened BB events.
+
+## Dobby Intelligence Layer v1
+
+The Telegram bridge may handle a narrow set of clear high-confidence requests before calling the LLM:
+
+- clear item-location memory save, for example `幫我記住成長椅嘅工具放咗喺工具箱`
+- clear item-location memory query, for example `成長椅嘅工具喺邊`
+- clear existing-item safety-stock update, for example `幫我設定返白胡椒粉嘅安全存量係一樽`
+- explicit inventory consume
+- explicit batch restock
+- explicit shopping task completion
+
+If a deterministic path does not fire, continue normally with this skill. Do not assume the deterministic path already wrote anything unless the bridge provides a successful execution result in the turn context.
+
 Read these references only as needed:
 
 - `plugins-staging/family-os-bb-inventory/skills/family-os-bb-inventory/references/bb-log-templates.md`
@@ -240,7 +266,10 @@ Do not turn a durable household memory into a `task` unless the user actually wa
 - `clinic_visit` and `doctor_visit` ask only for the minimum missing identifying fact
 - Ambiguous inventory item names ask likely choices
 - Ambiguous inventory units ask before writing
+- For batch restock, if any one item is ambiguous, ask before writing any item in that batch. After the user clarifies, write the whole resolved batch in one `record_inventory_purchase_batch`.
 - Explicit remaining stock prefers stock-level updates instead of consume
+- Safety stock wording such as `安全存量`, `安全，存量`, `最低存量`, `minimum stock`, or `補貨線` means update the inventory item's `safety_stock`, not the current `quantity_on_hand`.
+- For safety stock updates, use `upsert_inventory_item` only after one existing inventory item is clearly identified. Do not create a new item from a safety-stock-only request.
 - If the user follows a recent inventory restock with `幫我記低埋佢哋係...到期` or similar wording, treat it as an expiry-date follow-up on that same inventory item when the target is still unique.
 - For an expiry-only follow-up on an existing inventory item, use `update_inventory_expiry_date` instead of repeating a purchase write.
 - New untracked items use bootstrap logic instead of forcing an existing-item match

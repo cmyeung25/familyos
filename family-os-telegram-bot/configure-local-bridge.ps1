@@ -28,7 +28,11 @@ else {
 
 $env:FAMILY_OS_BOT_CHECK_ONLY = "1"
 try {
-    & (Join-Path $PSScriptRoot "start-bot.ps1")
+    $startBotScript = Join-Path $PSScriptRoot "start-bot.ps1"
+    if (-not (Test-Path -LiteralPath $startBotScript)) {
+        $startBotScript = Join-Path $PSScriptRoot "start-bot-deepseek.ps1"
+    }
+    & $startBotScript
 }
 finally {
     Remove-Item Env:FAMILY_OS_BOT_CHECK_ONLY -ErrorAction SilentlyContinue
