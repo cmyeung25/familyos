@@ -1,11 +1,14 @@
-const CACHE_NAME = "family-os-bb-ipad-v8";
+const CACHE_NAME = "family-os-bb-ipad-v9";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
   "/manifest.webmanifest",
-  "/assets/icon.svg",
+  "/assets/app-icon-32.png",
+  "/assets/app-icon-180.png",
+  "/assets/app-icon-192.png",
+  "/assets/app-icon-512.png",
   "/assets/icons-flat-v2/bottle.png",
   "/assets/icons-flat-v2/calendar.png",
   "/assets/icons-flat-v2/chart.png",
