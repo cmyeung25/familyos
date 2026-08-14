@@ -14,6 +14,8 @@ const allowedActions = new Set([
   "health",
   "get_recent_baby_logs",
   "append_baby_log",
+  "update_baby_log",
+  "delete_baby_log",
 ]);
 
 function securityHeaders() {

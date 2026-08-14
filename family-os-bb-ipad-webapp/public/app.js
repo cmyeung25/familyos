@@ -34,6 +34,10 @@ const I18N = {
     milkTimerStarted: "已開始沖奶計時", feedSaving: "記錄飲奶", feedSuccess: "飲奶記錄成功", tempSaving: "記錄體溫", tempSuccess: "已成功記錄體溫", timerCleared: "已清除沖奶計時", localTimerRemoved: "本機計時已移除",
     switchLanguage: "Switch to English", settingsLabel: "設定", close: "關閉", checking: "檢查中", saveFailed: "儲存失敗", noValue: "沒有",
     startedDetail: "{ml} ml · {time} 開始{medicine}", medicineSuffix: " · 有餵藥", diaperDetail: "{time} · 尿尿{pee} · 便便{poo}",
+    editRecord: "修改記錄", editHint: "點按最近記錄可修改", recordDate: "記錄日期", saveChanges: "儲存修改", deleteRecord: "刪除記錄",
+    deleteConfirmTitle: "確定刪除這筆記錄？", deleteConfirmBody: "記錄會從介面隱藏，原資料及更改歷史仍會保留。", cancel: "取消", confirmDelete: "確定刪除",
+    recordUpdating: "正在更新記錄", recordUpdated: "記錄已更新", recordDeleting: "正在刪除記錄", recordDeleted: "記錄已刪除", unsupportedEdit: "這類記錄暫不支援修改",
+    recordChanged: "記錄已在另一部裝置更改，請刷新後再試。", actualAmount: "實際飲奶量", changePreparedAmount: "沖奶量", previousDay: "前一日", nextDay: "後一日",
     times: "次", hour10: "10時", hour14: "14時", hour16: "16時", hour18: "18時", hour22: "22時", hour02: "02時", hour04: "04時", hour06: "06時",
   },
   en: {
@@ -57,6 +61,10 @@ const I18N = {
     milkTimerStarted: "Milk timer started", feedSaving: "Saving feeding", feedSuccess: "Feeding saved", tempSaving: "Saving temperature", tempSuccess: "Temperature saved", timerCleared: "Milk timer cleared", localTimerRemoved: "Local timer removed",
     switchLanguage: "切換至中文", settingsLabel: "Settings", close: "Close", checking: "Checking", saveFailed: "Save failed", noValue: "None",
     startedDetail: "{ml} ml · started {time}{medicine}", medicineSuffix: " · medicine given", diaperDetail: "{time} · urine {pee} · stool {poo}",
+    editRecord: "Edit record", editHint: "Tap a recent record to edit", recordDate: "Record date", saveChanges: "Save changes", deleteRecord: "Delete record",
+    deleteConfirmTitle: "Delete this record?", deleteConfirmBody: "It will be hidden from the app while the original data and change history remain available.", cancel: "Cancel", confirmDelete: "Delete",
+    recordUpdating: "Updating record", recordUpdated: "Record updated", recordDeleting: "Deleting record", recordDeleted: "Record deleted", unsupportedEdit: "This record type cannot be edited yet",
+    recordChanged: "This record changed on another device. Refresh and try again.", actualAmount: "Actual milk", changePreparedAmount: "Prepared milk", previousDay: "Previous day", nextDay: "Next day",
     times: "times", hour10: "10h", hour14: "14h", hour16: "16h", hour18: "18h", hour22: "22h", hour02: "02h", hour04: "04h", hour06: "06h",
   },
 };
@@ -73,6 +81,7 @@ const state = {
   noticeTimer: null,
   submitFlow: null,
   submitTimer: null,
+  recordEditor: null,
   temperatureOpen: false,
   finishOpen: false,
   actualMl: 120,
@@ -151,6 +160,19 @@ function handleClick(event) {
   if (action === "save-temperature") saveTemperature();
   if (action === "dismiss-submit") dismissSubmit();
   if (action === "timeline-filter") setTimelineFilter(button.dataset.filter);
+  if (action === "open-record") openRecordEditor(button.dataset.id);
+  if (action === "close-record") closeRecordEditor();
+  if (action === "edit-time-step") adjustRecordTime(Number(button.dataset.minutes));
+  if (action === "edit-intensity") setRecordIntensity(button.dataset.kind, button.dataset.value);
+  if (action === "edit-actual-step") adjustRecordActualMl(Number(button.dataset.delta));
+  if (action === "edit-prepared-step") adjustRecordPreparedMl(Number(button.dataset.delta));
+  if (action === "edit-set-actual") setRecordActualMl(Number(button.dataset.ml));
+  if (action === "edit-temp-step") adjustRecordTemperature(Number(button.dataset.delta));
+  if (action === "edit-toggle-medicine") toggleRecordMedicine();
+  if (action === "save-record") saveRecordChanges();
+  if (action === "ask-delete-record") setRecordDeleteConfirm(true);
+  if (action === "cancel-delete-record") setRecordDeleteConfirm(false);
+  if (action === "confirm-delete-record") deleteRecord();
 }
 
 function render() {
@@ -174,7 +196,7 @@ function render() {
   let page = renderPanel();
   if (state.activeTab === "timeline") page = renderTimelinePage();
   if (state.activeTab === "settings") page = renderSettingsPage();
-  app.innerHTML = `${page}${renderTemperatureModal()}${renderFeedingModal()}${renderSubmitOverlay()}`;
+  app.innerHTML = `${page}${renderTemperatureModal()}${renderFeedingModal()}${renderRecordEditorModal()}${renderSubmitOverlay()}`;
 }
 
 function renderNotice() {
@@ -280,7 +302,7 @@ function renderTimeControls(scope) {
   `).join("")}</div>`;
 }
 
-function renderIntensityControl(kind, selected) {
+function renderIntensityControl(kind, selected, action = "set-intensity") {
   const icon = kind === "poo" ? "poo" : "pee";
   const values = ["none", "small", "medium", "large"];
   return `
@@ -289,7 +311,7 @@ function renderIntensityControl(kind, selected) {
       <div class="segmented-control" role="group" aria-label="${kind === "poo" ? t("pooAmount") : t("peeAmount")}">
         ${values.map((value) => `
           <button class="choice-button ${selected === value ? "is-selected" : ""}" type="button"
-            data-action="set-intensity" data-kind="${kind}" data-value="${value}"
+            data-action="${action}" data-kind="${kind}" data-value="${value}"
             aria-label="${kind === "poo" ? t("poo") : t("pee")} ${t(value)}">
             <span class="amount-icon ${kind === "poo" ? "amount-poo" : ""} amount-${value}" aria-hidden="true"></span>
           </button>
@@ -384,7 +406,11 @@ function renderRecentItem(log) {
   const title = log.type === "diaper"
     ? `<div class="recent-diaper-icons"><span class="amount-icon amount-${log.diaper.pee}" aria-label="${t("pee")} ${t(log.diaper.pee)}"></span><span class="amount-icon amount-poo amount-${log.diaper.poo}" aria-label="${t("poo")} ${t(log.diaper.poo)}"></span></div>`
     : `${escapeHtml(log.title)}${log.medicineGiven ? iconHtml("medicine") : ""}`;
-  return `<article class="recent-item">${iconHtml(log.icon, log.utility)}<div><div class="recent-time">${formatClock(log.date)}</div><div class="age">${relativeAge(log.date)}</div></div><div><div class="recent-title">${title}</div><div class="recent-detail">${escapeHtml(log.detail)}</div></div><div class="row-chevron">›</div></article>`;
+  const content = `${iconHtml(log.icon, log.utility)}<div><div class="recent-time">${formatClock(log.date)}</div><div class="age">${relativeAge(log.date)}</div></div><div><div class="recent-title">${title}</div><div class="recent-detail">${escapeHtml(log.detail)}</div></div>`;
+  if (isEditableRecordType(log.type)) {
+    return `<button class="recent-item recent-item-button" type="button" data-action="open-record" data-id="${escapeHtml(log.id)}" aria-label="${t("editRecord")}: ${escapeHtml(log.title)}">${content}<div class="row-chevron">›</div></button>`;
+  }
+  return `<article class="recent-item recent-item-static">${content}<div></div></article>`;
 }
 
 function renderInsightsCard() {
@@ -428,6 +454,59 @@ function renderRhythm(start,end) {
 function renderTemperatureModal() {
   if (!state.temperatureOpen) return "";
   return `<div class="modal-backdrop" role="presentation"><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="temperature-title"><div class="modal-header"><h2 class="modal-title" id="temperature-title">${iconHtml("temp")}${t("recordTemperature")}</h2><button class="close-button" data-action="close-temperature" aria-label="${t("close")}">×</button></div><div class="modal-section"><p class="modal-label">${t("time")}</p><div class="modal-time">${formatClock(effectiveTime("temperature"))} <span class="time-now">${state.timeFollowing.temperature ? t("now") : t("adjusted")}</span></div>${renderTimeControls("temperature")}</div><div class="modal-section"><p class="modal-label">${t("temperature")}</p><div class="temp-display">${state.temperature.toFixed(1)}<span>°C</span></div><div class="temp-step-row"><button class="secondary-button" data-action="temp-step" data-delta="-0.5">-0.5</button><button class="secondary-button" data-action="temp-step" data-delta="-0.1">-0.1</button><button class="secondary-button" data-action="temp-step" data-delta="0.1">+0.1</button><button class="secondary-button" data-action="temp-step" data-delta="0.5">+0.5</button></div></div><button class="primary-button pink" data-action="save-temperature" ${savingAttr("temperature")}>${iconHtml("temp")}${t("recordTemperature")}</button></section></div>`;
+}
+
+function renderRecordEditorModal() {
+  const editor = state.recordEditor;
+  if (!editor) return "";
+  const icon = editor.type === "feeding" ? "bottle" : editor.type === "diaper" ? "diaper" : "temp";
+  const saving = state.saving === "record-update" || state.saving === "record-delete";
+  return `
+    <div class="modal-backdrop record-editor-backdrop" role="presentation">
+      <section class="modal-card record-editor" role="dialog" aria-modal="true" aria-labelledby="record-editor-title">
+        <div class="modal-header">
+          <h2 class="modal-title" id="record-editor-title">${iconHtml(icon)}${t("editRecord")}</h2>
+          <button class="close-button" type="button" data-action="close-record" aria-label="${t("close")}" ${saving ? "disabled" : ""}>×</button>
+        </div>
+        <div class="record-time-panel">
+          <div>
+            <p class="modal-label">${t("recordDate")}</p>
+            <strong class="record-date-value">${formatRecordDate(editor.eventAt)}</strong>
+          </div>
+          <div class="record-day-controls">
+            <button class="secondary-button" type="button" data-action="edit-time-step" data-minutes="-1440" aria-label="${t("previousDay")}">−1d</button>
+            <button class="secondary-button" type="button" data-action="edit-time-step" data-minutes="1440" aria-label="${t("nextDay")}">+1d</button>
+          </div>
+          <div class="record-clock">${formatClock(editor.eventAt)}</div>
+          <div class="step-row record-step-row">${[[-30,"-30"],[-15,"-15"],[-5,"-5"],[-1,"-1"],[1,"+1"],[5,"+5"],[15,"+15"],[30,"+30"]].map(([minutes,label]) => `<button class="step-button" type="button" data-action="edit-time-step" data-minutes="${minutes}">${label}</button>`).join("")}</div>
+        </div>
+        ${renderRecordEditorFields(editor)}
+        <div class="record-primary-actions">
+          <button class="primary-button" type="button" data-action="save-record" ${saving ? "disabled" : ""}>${iconHtml("check")}${t("saveChanges")}</button>
+          <button class="danger-button" type="button" data-action="ask-delete-record" ${saving ? "disabled" : ""}>${t("deleteRecord")}</button>
+        </div>
+        ${editor.deleteConfirm ? `<div class="delete-confirmation" role="alert"><div><strong>${t("deleteConfirmTitle")}</strong><p>${t("deleteConfirmBody")}</p></div><div class="delete-confirm-actions"><button class="secondary-button" type="button" data-action="cancel-delete-record">${t("cancel")}</button><button class="danger-button solid" type="button" data-action="confirm-delete-record">${t("confirmDelete")}</button></div></div>` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderRecordEditorFields(editor) {
+  if (editor.type === "diaper") {
+    return `<div class="record-fields">${renderIntensityControl("pee", editor.pee, "edit-intensity")}${renderIntensityControl("poo", editor.poo, "edit-intensity")}</div>`;
+  }
+  if (editor.type === "temperature") {
+    return `<div class="record-fields"><p class="modal-label">${t("temperature")}</p><div class="temp-display">${editor.temperature.toFixed(1)}<span>°C</span></div><div class="temp-step-row"><button class="secondary-button" data-action="edit-temp-step" data-delta="-0.5">-0.5</button><button class="secondary-button" data-action="edit-temp-step" data-delta="-0.1">-0.1</button><button class="secondary-button" data-action="edit-temp-step" data-delta="0.1">+0.1</button><button class="secondary-button" data-action="edit-temp-step" data-delta="0.5">+0.5</button></div></div>`;
+  }
+  return `<div class="record-fields feeding-edit-fields">
+    ${renderRecordAmountEditor(t("actualAmount"), editor.actualMl, "edit-actual-step")}
+    ${renderRecordAmountEditor(t("changePreparedAmount"), editor.preparedMl, "edit-prepared-step")}
+    <button class="medication-toggle ${editor.medicineGiven ? "is-selected" : ""}" type="button" data-action="edit-toggle-medicine" aria-pressed="${editor.medicineGiven}">${iconHtml("medicine")}<span>${t("gaveMedicine")}</span></button>
+  </div>`;
+}
+
+function renderRecordAmountEditor(label, value, action) {
+  return `<div class="record-amount-row"><span>${label}</span><button class="secondary-button" type="button" data-action="${action}" data-delta="-5">−5</button><strong>${value}<small> ml</small></strong><button class="secondary-button" type="button" data-action="${action}" data-delta="5">+5</button></div>`;
 }
 
 function renderSubmitOverlay() {
@@ -540,6 +619,192 @@ function saveTemperature() {
   runSave("temperature",`iPad BB App 探熱 ${value.toFixed(1)}°C`,payload,() => { resetTimeFollowing("temperature"); },{icon:"temp",savingTitle:t("tempSaving"),successTitle:t("tempSuccess"),detail:`${value.toFixed(1)}°C · ${time}`});
 }
 
+function openRecordEditor(id) {
+  const raw = state.logs.find((log) => String(log.baby_log_id || "") === String(id || ""));
+  if (!raw) return;
+  const log = normalizeLog(raw);
+  if (!isEditableRecordType(log.type)) {
+    showNotice(t("unsupportedEdit"), log.title, "error");
+    return;
+  }
+  const actualMl = Math.max(0, Number(raw.value_number || 0));
+  const preparedMl = Math.max(actualMl, log.preparedMl || actualMl || 30);
+  const boundedPreparedMl = clamp(Math.round(preparedMl / 5) * 5, 30, 240);
+  const startedAt = parseTimestamp(raw.started_at) || log.date;
+  const endedAt = parseTimestamp(raw.ended_at);
+  state.recordEditor = {
+    id: log.id,
+    type: log.type,
+    raw: {...raw},
+    updatedAt: String(raw.updated_at || ""),
+    eventAt: new Date(startedAt),
+    feedingDurationMs: endedAt ? Math.max(0, endedAt.getTime() - startedAt.getTime()) : 0,
+    actualMl: Math.min(Math.round(actualMl / 5) * 5, boundedPreparedMl),
+    preparedMl: boundedPreparedMl,
+    medicineGiven: log.medicineGiven,
+    pee: log.diaper.pee,
+    poo: log.diaper.poo,
+    temperature: clamp(Number(raw.value_number || 36.8), 34, 42),
+    deleteConfirm: false,
+  };
+  render();
+}
+
+function closeRecordEditor() {
+  if (state.saving === "record-update" || state.saving === "record-delete") return;
+  state.recordEditor = null;
+  render();
+}
+
+function adjustRecordTime(minutes) {
+  if (!state.recordEditor) return;
+  state.recordEditor.eventAt = new Date(state.recordEditor.eventAt.getTime() + minutes * 60000);
+  render();
+}
+
+function setRecordIntensity(kind, value) {
+  if (!state.recordEditor || !["pee", "poo"].includes(kind) || !["none", "small", "medium", "large"].includes(value)) return;
+  state.recordEditor[kind] = value;
+  render();
+}
+
+function adjustRecordActualMl(delta) {
+  if (!state.recordEditor) return;
+  setRecordActualMl(state.recordEditor.actualMl + delta);
+}
+
+function setRecordActualMl(value) {
+  if (!state.recordEditor) return;
+  state.recordEditor.actualMl = clamp(Math.round(value / 5) * 5, 0, state.recordEditor.preparedMl);
+  render();
+}
+
+function adjustRecordPreparedMl(delta) {
+  if (!state.recordEditor) return;
+  state.recordEditor.preparedMl = clamp(Math.round((state.recordEditor.preparedMl + delta) / 5) * 5, 30, 240);
+  state.recordEditor.actualMl = Math.min(state.recordEditor.actualMl, state.recordEditor.preparedMl);
+  render();
+}
+
+function adjustRecordTemperature(delta) {
+  if (!state.recordEditor) return;
+  state.recordEditor.temperature = clamp(Math.round((state.recordEditor.temperature + delta) * 10) / 10, 34, 42);
+  render();
+}
+
+function toggleRecordMedicine() {
+  if (!state.recordEditor) return;
+  state.recordEditor.medicineGiven = !state.recordEditor.medicineGiven;
+  render();
+}
+
+function setRecordDeleteConfirm(value) {
+  if (!state.recordEditor) return;
+  state.recordEditor.deleteConfirm = Boolean(value);
+  render();
+}
+
+async function saveRecordChanges() {
+  const editor = state.recordEditor;
+  if (!editor || state.saving) return;
+  let patch;
+  let detail;
+  if (editor.type === "diaper") {
+    if (editor.pee === "none" && editor.poo === "none") {
+      showNotice(t("missingAmount"), t("chooseOne"), "error");
+      return;
+    }
+    const readable = `尿尿 ${intensityLabels[editor.pee].long}; 便便 ${intensityLabels[editor.poo].long}`;
+    patch = {
+      event_at: toHongKongTimestamp(editor.eventAt),
+      log_subtype: "pee_poo",
+      description: `BB 換片: ${readable}`,
+      value_text: JSON.stringify({pee:editor.pee,poo:editor.poo}),
+    };
+    detail = t("diaperDetail", {time:formatClock(editor.eventAt),pee:t(editor.pee),poo:t(editor.poo)});
+  } else if (editor.type === "temperature") {
+    const value = Number(editor.temperature.toFixed(1));
+    patch = {
+      event_at: toHongKongTimestamp(editor.eventAt),
+      log_subtype: "body",
+      description: `BB 探熱 ${value.toFixed(1)}°C`,
+      value_number: value,
+      unit: "celsius",
+    };
+    detail = `${value.toFixed(1)}°C · ${formatClock(editor.eventAt)}`;
+  } else {
+    const preparedAt = new Date(editor.eventAt);
+    const expiresAt = new Date(preparedAt.getTime() + 3600000);
+    const endedAt = editor.feedingDurationMs ? new Date(preparedAt.getTime() + editor.feedingDurationMs) : "";
+    patch = {
+      event_at: toHongKongTimestamp(preparedAt),
+      started_at: toHongKongTimestamp(preparedAt),
+      ended_at: endedAt ? toHongKongTimestamp(endedAt) : "",
+      log_subtype: editor.raw.log_subtype || "formula_milk",
+      value_number: editor.actualMl,
+      unit: "ml",
+      remarks: updateFeedingRemarks(editor.raw.remarks, {
+        prepared_ml: editor.preparedMl,
+        actual_ml: editor.actualMl,
+        medicine_given: editor.medicineGiven,
+        prepared_at: toHongKongTimestamp(preparedAt),
+        expires_at: toHongKongTimestamp(expiresAt),
+      }),
+    };
+    detail = `${editor.actualMl} / ${editor.preparedMl} ml · ${formatClock(preparedAt)}${editor.medicineGiven ? t("medicineSuffix") : ""}`;
+  }
+  await runRecordMutation("update_baby_log", "record-update", {
+    baby_log_id: editor.id,
+    expected_updated_at: editor.updatedAt,
+    patch,
+  }, t("recordUpdating"), t("recordUpdated"), detail);
+}
+
+async function deleteRecord() {
+  const editor = state.recordEditor;
+  if (!editor || state.saving) return;
+  await runRecordMutation("delete_baby_log", "record-delete", {
+    baby_log_id: editor.id,
+    expected_updated_at: editor.updatedAt,
+  }, t("recordDeleting"), t("recordDeleted"), `${formatRecordDate(editor.eventAt)} · ${formatClock(editor.eventAt)}`);
+}
+
+async function runRecordMutation(action, savingKey, payload, savingTitle, successTitle, detail) {
+  const editor = state.recordEditor;
+  if (!editor) return;
+  window.clearInterval(state.submitTimer);
+  state.saving = savingKey;
+  state.submitFlow = {status:"saving",icon:editor.type === "feeding" ? "bottle" : editor.type === "diaper" ? "diaper" : "temp",savingTitle,kind:savingKey};
+  render();
+  try {
+    const result = await callApi(action, payload, `iPad BB App ${action}: ${editor.id}`);
+    if (action === "delete_baby_log") state.logs = state.logs.filter((log) => log.baby_log_id !== editor.id);
+    else state.logs = state.logs.map((log) => log.baby_log_id === editor.id ? result : log);
+    localStorage.setItem(STORAGE_KEYS.logs, JSON.stringify(state.logs));
+    state.recordEditor = null;
+    state.saving = "";
+    state.submitFlow = {status:"success",icon:"check",successTitle,detail,countdown:0,kind:savingKey};
+    render();
+    await refreshData("record-mutation");
+  } catch (error) {
+    state.saving = "";
+    const message = /changed after|already been deleted/i.test(String(error.message || "")) ? t("recordChanged") : (error.message || t("saveFailed"));
+    state.submitFlow = {status:"error",detail:message,kind:savingKey};
+    render();
+  }
+}
+
+function updateFeedingRemarks(remarks, values) {
+  const structuredKeys = new Set(Object.keys(values));
+  const parts = String(remarks || "").split(";").map((part) => part.trim()).filter(Boolean).filter((part) => {
+    const match = /^([a-z_]+)=/i.exec(part);
+    return !match || !structuredKeys.has(match[1].toLowerCase());
+  });
+  if (!parts.length) parts.push("Recorded through iPad BB App");
+  Object.entries(values).forEach(([key,value]) => parts.push(`${key}=${value}`));
+  return parts.join("; ");
+}
+
 function scheduleSubmitDismiss() {
   window.clearInterval(state.submitTimer);
   state.submitTimer = window.setInterval(() => {
@@ -611,6 +876,8 @@ function parseDiaper(log) {
   catch { const text = `${log.description || ""} ${log.value_text || ""}`.toLowerCase(); return {pee:parseIntensityFromText(text,"pee") || "none",poo:parseIntensityFromText(text,"poo") || parseIntensityFromText(text,"stool") || "none"}; }
 }
 
+function isEditableRecordType(type) { return ["feeding", "diaper", "temperature"].includes(String(type)); }
+
 function parseIntensityFromText(text,key) {
   const match = new RegExp(`${key}\\s*[:= ]\\s*(none|small|medium|large|無|少|中|多|少量|中量|多量)`,"i").exec(text);
   if (!match) return ""; const value = match[1];
@@ -640,6 +907,9 @@ function toHongKongTimestamp(date) { const p=dateParts(date,{year:"numeric",mont
 function startOfHongKongDay(date) { const p=dateParts(date,{year:"numeric",month:"2-digit",day:"2-digit"}); return parseTimestamp(`${p.year}-${p.month}-${p.day} 00:00:00+08:00`); }
 function dateParts(date,options) { return Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:HK_TZ,...options}).formatToParts(date).filter(part => part.type !== "literal").map(part => [part.type,part.value])); }
 function formatClock(date) { return new Intl.DateTimeFormat("en-GB",{timeZone:HK_TZ,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(date); }
+function formatRecordDate(date) {
+  return new Intl.DateTimeFormat(state.lang === "en" ? "en-GB" : "zh-Hant-HK", {timeZone:HK_TZ,year:"numeric",month:"short",day:"numeric",weekday:"short"}).format(date);
+}
 function formatHeaderDate(date) {
   if (state.lang === "en") return new Intl.DateTimeFormat("en-GB",{timeZone:HK_TZ,day:"numeric",month:"short",weekday:"short"}).format(date);
   const p=Object.fromEntries(new Intl.DateTimeFormat("zh-Hant-HK",{timeZone:HK_TZ,month:"numeric",day:"numeric",weekday:"long"}).formatToParts(date).filter(part => part.type !== "literal").map(part => [part.type,part.value]));

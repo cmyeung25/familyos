@@ -115,6 +115,16 @@ const DOCUMENT_CATEGORIES = Object.freeze(["birth_certificate", "identity_docume
 const HOUSEHOLD_MEMORY_TYPES = Object.freeze(["item_location", "fact", "preference"]);
 const HOUSEHOLD_MEMORY_STATUSES = Object.freeze(["active", "moved", "archived"]);
 const HOUSEHOLD_MEMORY_CONFIDENCE = Object.freeze(["confirmed", "inferred", "tentative"]);
+const BABY_LOG_EDITABLE_FIELDS = Object.freeze([
+  "event_at", "log_subtype", "description", "value_number", "value_text", "unit",
+  "started_at", "ended_at", "recorded_by_person_id", "remarks",
+]);
+const BABY_LOG_INTENSITIES = Object.freeze(["none", "small", "medium", "large"]);
+const BABY_LOG_RESULT_FIELDS = Object.freeze([
+  "baby_log_id", "event_at", "log_type", "log_subtype", "description",
+  "value_number", "value_text", "unit", "started_at", "ended_at",
+  "duration_minutes", "status", "created_at", "updated_at", "remarks",
+]);
 
 function doGet() {
   return json_({
@@ -188,6 +198,14 @@ function route_(action, payload, request) {
     case "append_baby_log":
       return withWriteLock_(function () {
         return appendBabyLog_(payload, request);
+      });
+    case "update_baby_log":
+      return withWriteLock_(function () {
+        return updateBabyLog_(payload, request);
+      });
+    case "delete_baby_log":
+      return withWriteLock_(function () {
+        return deleteBabyLog_(payload, request);
       });
     case "append_bb_calendar_event":
       return withWriteLock_(function () {
@@ -328,13 +346,9 @@ function getRecentBabyLogs_(payload) {
   const limit = clampNumber_(payload.limit || 20, 1, 100);
   const type = payload.log_type ? String(payload.log_type) : "";
   return rowsAsObjects_("baby_log").filter(function (row) {
-    return row.baby_log_id && (!type || row.log_type === type);
+    return row.baby_log_id && String(row.status || "active") !== "deleted" && (!type || row.log_type === type);
   }).slice(-limit).reverse().map(function (row) {
-    return pick_(row, [
-      "baby_log_id", "event_at", "log_type", "log_subtype", "description",
-      "value_number", "value_text", "unit", "started_at", "ended_at",
-      "duration_minutes", "remarks",
-    ]);
+    return compactBabyLog_(row);
   });
 }
 
@@ -747,10 +761,7 @@ function appendBabyLog_(payload, request) {
   normalizeBabyLog_(record);
   appendRecord_("baby_log", record);
   appendAudit_("baby_log", record.baby_log_id, "append", {}, record, request);
-  return pick_(record, [
-    "baby_log_id", "event_at", "log_type", "log_subtype", "description",
-    "value_number", "value_text", "unit", "remarks",
-  ]);
+  return compactBabyLog_(record);
 }
 
 function normalizeBabyLog_(record) {
@@ -761,6 +772,123 @@ function normalizeBabyLog_(record) {
     record.unit = "ml";
     record.remarks = record.remarks || "Recorded through Family OS API";
   }
+}
+
+function updateBabyLog_(payload, request) {
+  assertAllowedKeys_(payload, ["baby_log_id", "patch", "expected_updated_at"], "update_baby_log");
+  const recordId = requireString_(payload.baby_log_id, "baby_log_id");
+  const patch = copyObject_(payload.patch);
+  assertAllowedKeys_(patch, BABY_LOG_EDITABLE_FIELDS, "patch");
+  if (Object.keys(patch).length === 0) throw new Error("patch must contain at least one field.");
+
+  const located = requireEditableBabyLog_(recordId, payload.expected_updated_at);
+  const normalized = normalizeBabyLogPatch_(patch);
+  const now = now_();
+  const after = Object.assign({}, located.record, normalized, {
+    updated_at: now,
+    updated_by: "apps_script",
+  });
+  validateEditableBabyLog_(after);
+  normalizeBabyLog_(after);
+
+  const changes = {};
+  BABY_LOG_EDITABLE_FIELDS.forEach(function (field) {
+    if (hasOwn_(normalized, field) || after[field] !== located.record[field]) {
+      changes[field] = after[field];
+    }
+  });
+  changes.updated_at = now;
+  changes.updated_by = "apps_script";
+  writeRecordFields_("baby_log", located.rowNumber, changes);
+  appendAudit_("baby_log", recordId, "update", located.record, after, request);
+  return compactBabyLog_(after);
+}
+
+function deleteBabyLog_(payload, request) {
+  assertAllowedKeys_(payload, ["baby_log_id", "expected_updated_at"], "delete_baby_log");
+  const recordId = requireString_(payload.baby_log_id, "baby_log_id");
+  const located = requireEditableBabyLog_(recordId, payload.expected_updated_at);
+  const now = now_();
+  const after = Object.assign({}, located.record, {
+    status: "deleted",
+    updated_at: now,
+    updated_by: "apps_script",
+  });
+  writeRecordFields_("baby_log", located.rowNumber, {
+    status: "deleted",
+    updated_at: now,
+    updated_by: "apps_script",
+  });
+  appendAudit_("baby_log", recordId, "delete", located.record, after, request);
+  return compactBabyLog_(after);
+}
+
+function requireEditableBabyLog_(recordId, expectedUpdatedAt) {
+  const located = findRecordWithRow_("baby_log", "baby_log_id", recordId);
+  if (!located) throw new Error("Unknown baby_log_id: " + recordId);
+  if (String(located.record.status || "active") === "deleted") {
+    throw new Error("Baby log has already been deleted.");
+  }
+  if (["feeding", "diaper", "temperature"].indexOf(String(located.record.log_type)) === -1) {
+    throw new Error("This baby log type cannot be edited in the iPad app.");
+  }
+  if (expectedUpdatedAt) {
+    const current = compactRow_(located.record, ["updated_at"]).updated_at || "";
+    if (String(current) !== String(expectedUpdatedAt)) {
+      throw new Error("Baby log changed after it was loaded. Refresh and try again.");
+    }
+  }
+  return located;
+}
+
+function normalizeBabyLogPatch_(payload) {
+  const record = copyObject_(payload);
+  if (hasOwn_(record, "event_at")) record.event_at = timestamp_(record.event_at);
+  if (hasOwn_(record, "started_at")) record.started_at = optionalTimestamp_(record.started_at);
+  if (hasOwn_(record, "ended_at")) record.ended_at = optionalTimestamp_(record.ended_at);
+  if (hasOwn_(record, "value_number")) record.value_number = optionalNumber_(record.value_number);
+  ["log_subtype", "description", "value_text", "unit", "recorded_by_person_id", "remarks"].forEach(function (field) {
+    if (hasOwn_(record, field)) record[field] = String(record[field] || "").trim();
+  });
+  return record;
+}
+
+function validateEditableBabyLog_(record) {
+  const type = String(record.log_type || "");
+  if (type === "feeding") {
+    const amount = requireNumber_(record.value_number, "value_number");
+    if (amount < 0 || amount > 2000) throw new Error("Feeding amount must be between 0 and 2000 ml.");
+    if (String(record.unit || "").toLowerCase() !== "ml") throw new Error("Feeding unit must be ml.");
+    if (record.started_at && record.ended_at) {
+      const started = parseDate_(record.started_at);
+      const ended = parseDate_(record.ended_at);
+      if (!started || !ended || ended < started) throw new Error("Feeding end time must not be before start time.");
+    }
+    return;
+  }
+  if (type === "temperature") {
+    const value = requireNumber_(record.value_number, "value_number");
+    if (value < 30 || value > 45) throw new Error("Temperature must be between 30 and 45 celsius.");
+    return;
+  }
+  if (type === "diaper") {
+    let amounts;
+    try {
+      amounts = JSON.parse(String(record.value_text || ""));
+    } catch (error) {
+      throw new Error("Diaper amounts must be valid JSON.");
+    }
+    if (BABY_LOG_INTENSITIES.indexOf(String(amounts.pee)) === -1 || BABY_LOG_INTENSITIES.indexOf(String(amounts.poo)) === -1) {
+      throw new Error("Diaper amounts must be none, small, medium, or large.");
+    }
+    if (amounts.pee === "none" && amounts.poo === "none") {
+      throw new Error("Select at least one diaper amount.");
+    }
+  }
+}
+
+function compactBabyLog_(record) {
+  return compactRow_(record, BABY_LOG_RESULT_FIELDS);
 }
 
 function recordInventoryMovement_(payload, request) {

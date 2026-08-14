@@ -11,7 +11,7 @@ iPad Safari / Home Screen
   -> Google Sheets
 ```
 
-The browser never receives `FAMILY_OS_API_KEY`. The container exposes only the BB PWA and the three allowlisted Apps Script actions already used by the app.
+The browser never receives `FAMILY_OS_API_KEY`. The container exposes only the BB PWA and five allowlisted Apps Script actions: health, recent-log reads, append, audited update, and audited soft-delete.
 
 ## NAS Paths And Files
 

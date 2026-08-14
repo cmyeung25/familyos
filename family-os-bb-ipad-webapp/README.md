@@ -17,6 +17,8 @@ The browser never receives `FAMILY_OS_API_KEY`. The server exposes only these wh
 - `health`
 - `get_recent_baby_logs`
 - `append_baby_log`
+- `update_baby_log`
+- `delete_baby_log`
 
 ## Start Locally
 
@@ -46,7 +48,7 @@ The production NAS service is defined in `../docker-compose.bb-ipad.yml`. From t
 
 ## Data Mapping
 
-All writes go to the existing `baby_log` sheet through `append_baby_log`.
+New records go to the existing `baby_log` sheet through `append_baby_log`. Supported recent rows can be corrected through `update_baby_log` or hidden through audited `delete_baby_log` soft deletion.
 
 | UI action | API payload shape |
 | --- | --- |
@@ -55,6 +57,8 @@ All writes go to the existing `baby_log` sheet through `append_baby_log`.
 | 探熱 | `log_type=temperature`, `log_subtype=body`, `value_number=<temperature>`, `unit=celsius` |
 
 Prepared bottle state is local to the iPad until the feed is completed. When a feed is saved, `remarks` includes `prepared_ml`, `actual_ml`, `prepared_at`, and `expires_at` so the app can calculate actual vs prepared milk without changing the workbook schema.
+
+Tap a recent feeding, diaper, or temperature row to open the bilingual editor popup. Updates use `updated_at` optimistic concurrency. Delete requires a second confirmation, sets `status=deleted`, and preserves the original row plus before/after snapshots in `audit_log`.
 
 The generated flat PNG icons under `public/assets/icons-flat-v2/` are individually cropped and rendered with preserved aspect ratio. They are part of the PWA cache, so increment the service worker cache name when replacing them.
 

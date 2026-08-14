@@ -363,6 +363,9 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
 .recent-list { background: var(--card); border: 1px solid var(--line); border-radius: 10px; flex: 1; overflow: hidden; }
 .recent-item { align-items: center; border-top: 1px solid var(--soft-line); display: grid; gap: 6px; grid-template-columns: 30px 62px 1fr 12px; min-height: 48px; padding: 5px 7px; }
 .recent-item:first-child { border-top: 0; }
+.recent-item-button { background: transparent; color: inherit; text-align: left; width: 100%; }
+.recent-item-button:active { background: #fff1f6; }
+.recent-item-static { grid-template-columns: 30px 62px 1fr 12px; }
 .recent-item .event-icon { height: 27px; width: 27px; }
 .recent-time { font-size: 12px; font-weight: 760; }.age { color: var(--muted); font-size: 9px; }
 .recent-title { align-items: center; display: flex; font-size: 12px; font-weight: 700; gap: 4px; }
@@ -452,6 +455,44 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
 .feeding-modal .medication-toggle { grid-column: auto; height: 44px; justify-content: center; justify-self: stretch; margin-top: 8px; width: 100%; }
 .feeding-modal .medication-toggle span { color: #72590b; font-size: 13px; font-weight: 750; margin-left: 7px; }
 
+.record-editor { max-height: calc(100dvh - 44px); overflow: hidden; width: min(540px,calc(100vw - 44px)); }
+.record-time-panel {
+  align-items: center;
+  background: #fff7fa;
+  border: 1px solid #efdce5;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: 1fr auto auto;
+  padding: 10px;
+}
+.record-time-panel .modal-label { margin-bottom: 3px; }
+.record-date-value { font-size: 13px; }
+.record-clock { color: var(--indigo-deep); font-size: 27px; font-weight: 790; }
+.record-day-controls { display: flex; gap: 5px; }
+.record-day-controls .secondary-button { min-height: 34px; min-width: 47px; padding-inline: 8px; }
+.record-step-row { grid-column: 1 / -1; }
+.record-fields { border: 1px solid var(--soft-line); border-radius: 10px; margin-top: 8px; padding: 10px; }
+.record-fields .intensity-row { margin-top: 5px; }
+.record-fields .intensity-row:first-child { margin-top: 0; }
+.record-amount-row { align-items: center; display: grid; gap: 8px; grid-template-columns: minmax(110px,1fr) 48px 82px 48px; min-height: 44px; }
+.record-amount-row + .record-amount-row { border-top: 1px solid var(--soft-line); }
+.record-amount-row > span { font-size: 12px; font-weight: 720; }
+.record-amount-row strong { color: var(--indigo-deep); font-size: 24px; text-align: center; }
+.record-amount-row small { color: var(--muted); font-size: 11px; }
+.feeding-edit-fields .medication-toggle { height: 40px; justify-content: center; margin-top: 6px; width: 100%; }
+.feeding-edit-fields .medication-toggle span { color: #72590b; font-size: 12px; font-weight: 750; margin-left: 7px; }
+.record-primary-actions { display: grid; gap: 8px; grid-template-columns: 1fr 132px; margin-top: 9px; }
+.record-primary-actions .primary-button { min-height: 43px; }
+.danger-button { background: #fff; border: 1px solid #e5aab2; border-radius: 8px; color: var(--danger); font-size: 12px; font-weight: 750; min-height: 40px; padding: 0 13px; }
+.danger-button:active { background: #fff0f2; }
+.danger-button.solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.delete-confirmation { align-items: center; background: #fff4f5; border: 1px solid #edc3c8; border-radius: 10px; display: grid; gap: 10px; grid-template-columns: 1fr auto; margin-top: 8px; padding: 9px 10px; }
+.delete-confirmation strong { color: #9f303b; display: block; font-size: 12px; }
+.delete-confirmation p { color: var(--muted); font-size: 10px; line-height: 1.35; margin-top: 3px; max-width: 290px; }
+.delete-confirm-actions { display: flex; gap: 6px; }
+.delete-confirm-actions button { min-height: 36px; }
+
 .submit-card { align-items: center; display: flex; flex-direction: column; min-height: 330px; padding: 22px; text-align: center; }
 .submit-card h2 { font-size: 19px; font-weight: 790; }.submit-symbol { align-items: center; border: 2px solid #d9dcf7; border-radius: 50%; display: flex; height: 126px; justify-content: center; margin: 22px 0 16px; position: relative; width: 126px; }
 .submit-symbol::before { animation: spin 1s linear infinite; border: 5px solid transparent; border-top-color: var(--indigo); border-radius: 50%; content: ''; inset: -2px; position: absolute; }
@@ -503,6 +544,7 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
   .column-panel { gap: 6px; padding: 7px; }.card-pad, .overview-card { padding: 8px; }.choice-button { min-height: 35px; }.amount-icon { height: 28px; width: 43px; }
   .bottle-block { height: 22px; }.primary-button { min-height: 33px; }.temperature-card { flex-basis: 53px; }
   .recent-item { min-height: 44px; }.bar-chart { height: 49px; }.stat-cell { min-height: 58px; }
+  .record-editor { padding: 10px; }.record-time-panel { padding: 8px; }.record-fields { padding: 8px; }.record-amount-row { min-height: 40px; }.delete-confirmation { padding-block: 7px; }
 }
 
 @media (max-width: 1050px) {

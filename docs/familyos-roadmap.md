@@ -218,7 +218,8 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - Goal:
   - provide a fixed home iPad surface for fast BB daily logging without keyboard input
 - Current implementation note:
-  - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the existing Apps Script API actions `health`, `get_recent_baby_logs`, and `append_baby_log`
+  - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the Apps Script API actions `health`, `get_recent_baby_logs`, `append_baby_log`, `update_baby_log`, and `delete_baby_log`
+  - recent feeding, diaper, and temperature records support optimistic-concurrency updates and audited soft deletion from a fixed-height popup
   - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
 
 ## Immediate Next Milestones
