@@ -13,6 +13,7 @@ This document is the shared planning artifact for Family OS. It is meant to help
 Family OS is a household assistant built around:
 
 - Telegram as the daily chat surface
+- an iPad add-to-home-screen BB logging surface for fast home records
 - an LLM bridge for reasoning
 - Google Apps Script + Google Sheets as the current operational database
 - multi-instance deployment on Synology NAS
@@ -44,6 +45,7 @@ The system is currently aimed at:
   - `docker-compose.monitoring.example.yml`
 - Google Sheets remains the live source of truth.
 - Apps Script is the current audited API layer.
+- A first iPad BB PWA implementation exists under `family-os-bb-ipad-webapp/`, using a thin Node proxy to the Apps Script API while keeping Google Sheets as the source of truth.
 - Telegram bot persona can now be loaded per instance from `config/persona.yaml`.
 - Brother instance is intentionally narrower than Gary:
   - inventory
@@ -55,6 +57,7 @@ The system is currently aimed at:
 - a structured `household_memory` capability for long-lived household facts
 - stronger skill governance and promotion flow
 - live provider cutover and operational playbook around LLM access
+- Synology HTTPS deployment and real iPad home-screen validation for the BB iPad PWA
 
 ### Deferred
 
@@ -109,6 +112,15 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: Dobby Intelligence Layer v1 context packet and deterministic fast paths for clear memory, safety-stock, batch-restock, consume, and shopping-task completion requests
 - `Planned`: household memory phrasing such as "記住 X 喺 Y"
 - `Planned`: semantic retrieval for memory lookups
+
+### Lane C2: iPad BB Home Surface
+
+- `In progress`: iPad landscape PWA for no-keyboard BB milk, diaper, and temperature logging
+- `Completed`: first static PWA shell, local active-bottle timer, recent timeline, Today and rolling 26-hour summaries
+- `Completed`: thin Node proxy that keeps `FAMILY_OS_API_KEY` server-side and uses existing Apps Script API actions
+- `Completed`: fixed-height bilingual iPad dashboard with flat non-distorted icons, temperature / feeding-completion popups, live-following event times, and per-feed diagonal-capsule medicine metadata stored in feeding remarks
+- `In progress`: Synology container and deploy script are implemented; trusted HTTPS reverse proxy and physical iPad home-screen validation remain
+- `Deferred`: shared cross-device active bottle state until a schema/API extension is explicitly approved
 
 ### Lane D: Knowledge And Skills
 
@@ -199,12 +211,22 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - Current implementation note:
   - Apps Script requires `FAMILY_OS_BB_CALENDAR_ID` as a Script Property and Calendar OAuth authorization before live use.
 
+### Phase 9: iPad BB PWA MVP
+
+- `In progress`
+- Goal:
+  - provide a fixed home iPad surface for fast BB daily logging without keyboard input
+- Current implementation note:
+  - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the existing Apps Script API actions `health`, `get_recent_baby_logs`, and `append_baby_log`
+  - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
+
 ## Immediate Next Milestones
 
 The active implementation milestones are:
 
 - `Household Memory MVP`, now building on `Dobby Intelligence Layer v1`
 - `BB Google Calendar MVP`, starting with future BB appointments and linked reminders
+- `BB iPad PWA`, documented in `docs/ipad-bb-webapp.md`, now ready for local smoke testing and Synology HTTPS deployment planning
 
 ### Household Memory MVP Goal
 

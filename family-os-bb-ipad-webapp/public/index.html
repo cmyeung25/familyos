@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#fff7fa">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="小桃B">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/assets/icon.svg">
+    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <title>小桃B</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="baby-avatar" aria-hidden="true"><span></span></div>
+          <div>
+            <h1>小桃B</h1>
+            <p class="header-date" id="header-age">6 週 3 天（45 日）</p>
+          </div>
+        </div>
+
+        <div class="time-center">
+          <span class="app-icon utility-icon icon-calendar" aria-hidden="true"></span>
+          <div>
+            <p id="header-date" class="today-label">--</p>
+            <div class="clock" id="header-clock">--:--</div>
+          </div>
+        </div>
+
+        <div class="header-controls">
+          <button class="language-button" id="language-button" type="button" data-action="toggle-language" aria-label="Switch to English">EN</button>
+          <button class="icon-button" type="button" data-action="tab" data-tab="settings" aria-label="設定">
+            <span class="app-icon utility-icon icon-settings" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <main id="app" class="app-main" tabindex="-1"></main>
+
+      <nav class="bottom-nav" aria-label="主要頁面">
+        <button class="tab-button is-active" type="button" data-action="tab" data-tab="panel">
+          <span class="app-icon utility-icon icon-home" aria-hidden="true"></span>
+          <span id="nav-home">首頁</span>
+        </button>
+        <button class="tab-button" type="button" data-action="tab" data-tab="timeline">
+          <span class="app-icon utility-icon icon-chart" aria-hidden="true"></span>
+          <span id="nav-stats">統計圖表</span>
+        </button>
+        <button class="tab-button" type="button" data-action="tab" data-tab="settings">
+          <span class="app-icon utility-icon icon-settings" aria-hidden="true"></span>
+          <span id="nav-settings">設定</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="notice" id="notice" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

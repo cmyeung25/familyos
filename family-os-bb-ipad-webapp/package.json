@@ -1,0 +1,14 @@
+{
+  "name": "family-os-bb-ipad-webapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "iPad add-to-home-screen BB logging PWA for Family OS.",
+  "type": "module",
+  "scripts": {
+    "start": "node --use-system-ca server.mjs",
+    "check": "node --check server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

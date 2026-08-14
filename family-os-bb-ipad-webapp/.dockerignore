@@ -1,0 +1,8 @@
+.git
+.env
+node_modules
+output
+README.md
+public/assets/baby-care-icons.png
+public/assets/diaper-amount-icons.png
+public/assets/utility-icons.png

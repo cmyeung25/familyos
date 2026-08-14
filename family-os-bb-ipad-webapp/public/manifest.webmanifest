@@ -1,0 +1,19 @@
+{
+  "name": "小桃B Family OS",
+  "short_name": "小桃B",
+  "description": "Touch-first BB milk, diaper, and temperature logging for Family OS.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#fff7fa",
+  "theme_color": "#fff7fa",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

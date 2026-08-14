@@ -22,6 +22,7 @@ family-os-telegram-bot/.telegram-queue/
 .codex-tmp/
 .uv-cache/
 outputs/
+output/
 family-os-build/output/
 family-os-build/node_modules/
 plugins-staging/family-os-bb-inventory/runtime/learned-knowledge.json
@@ -40,3 +41,6 @@ instances/*/skills_pending/
 instances/*/runtime/knowledge/
 plink.log
 tmp_*
+family-os-bb-ipad-webapp/public/assets/baby-care-icons.png
+family-os-bb-ipad-webapp/public/assets/diaper-amount-icons.png
+family-os-bb-ipad-webapp/public/assets/utility-icons.png

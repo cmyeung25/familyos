@@ -1,0 +1,661 @@
+const HK_TZ = "Asia/Hong_Kong";
+const STORAGE_KEYS = {
+  activeBottle: "family-os-bb-ipad:active-bottle",
+  language: "family-os-bb-ipad:language",
+  logs: "family-os-bb-ipad:logs-cache",
+};
+
+const intensityLabels = {
+  none: { long: "無" },
+  small: { long: "少量" },
+  medium: { long: "中量" },
+  large: { long: "多量" },
+};
+
+const I18N = {
+  zh: {
+    age: "6 週 3 天（45 日）", home: "首頁", stats: "統計圖表", settings: "設定",
+    quickLog: "快速記錄", current: "現在 / 進行中", todayOverview: "今日概覽", todayRange: "（00:00 至現在）",
+    diaperLog: "換片記錄", nowTime: "現在時間", now: "現在", adjusted: "已調整", recording: "記錄中...", recordDiaper: "記錄換片",
+    bottleLog: "沖奶記錄", milkAmount: "沖奶量", perBlock: "（每格 30 ml）", startMilkTimer: "開始沖奶計時",
+    temperatureLog: "探熱記錄", latest: "最新", recordTemperature: "記錄體溫", temperature: "體溫", time: "時間",
+    peeAmount: "尿尿分量", pooAmount: "便便分量", pee: "尿尿", poo: "便便", none: "無", small: "少量", medium: "中量", large: "多量",
+    milkTimer: "沖奶計時器", noActiveMilk: "未有進行中的沖奶", noActiveHelp: "開始沖奶後，60 分鐘計時會顯示在這裡",
+    milkTimerRunning: "沖奶計時中", expired: "已過期", remainingTime: "剩餘時間", preparedAmount: "沖奶量", startTime: "開始時間",
+    validUntil: "有效期至 {time}（1 小時內飲用）", medicineGiven: "今次有餵藥", finishFeed: "完成飲奶",
+    drinkDuration: "飲用時間", confirmActual: "確認實際飲奶量", fullFeed: "全飲", noMilk: "無飲", gaveMedicine: "餵藥", confirmFeed: "確認飲奶紀錄",
+    recentLogs: "最近記錄", viewAll: "查看全部 ›", noRecent: "未有最近 BB 紀錄", diaperRecord: "換片記錄", feedingRecord: "飲奶記錄", temperatureRecord: "體溫記錄",
+    actualMilk: "實際奶量", feeds: "{count} 次餵奶", preparedMilk: "沖奶量", leftover: "剩餘", past26: "過去 26 小時", average: "平均每次", sinceLastFeed: "距離上次餵奶", timeline26: "26 小時時間軸",
+    all: "全部", feeding: "飲奶", diaper: "換片", refresh: "刷新", showing: "顯示最新 {count} 筆", sheetsApi: "Google Sheets 經 Apps Script API 寫入", localCache: "本機快取", records: "{count} 筆", clearTimer: "清除沖奶計時",
+    submitWait: "記錄中，請勿關閉或切換頁面", submitFailed: "未能提交紀錄", retry: "返回再試", gotIt: "知道了", today: "今日", yesterday: "昨日", currentLabel: "現在",
+    justNow: "剛剛", minutesAgo: "{minutes} 分鐘前", hoursMinutesAgo: "{hours} 小時 {minutes} 分鐘前", hoursAgo: "{hours} 小時前", minutesDuration: "{minutes} 分鐘", hoursMinutesDuration: "{hours} 小時 {minutes} 分鐘", hoursDuration: "{hours} 小時",
+    refreshed: "已刷新紀錄", refreshedDetail: "{count} 筆 BB 紀錄", connectionFailed: "未能連接", apiOffline: "Family OS API 暫時離線",
+    missingAmount: "未選擇分量", chooseOne: "請至少選擇一項", diaperSaving: "記錄換片", diaperSuccess: "換片記錄成功",
+    milkTimerStarted: "已開始沖奶計時", feedSaving: "記錄飲奶", feedSuccess: "飲奶記錄成功", tempSaving: "記錄體溫", tempSuccess: "已成功記錄體溫", timerCleared: "已清除沖奶計時", localTimerRemoved: "本機計時已移除",
+    switchLanguage: "Switch to English", settingsLabel: "設定", close: "關閉", checking: "檢查中", saveFailed: "儲存失敗", noValue: "沒有",
+    startedDetail: "{ml} ml · {time} 開始{medicine}", medicineSuffix: " · 有餵藥", diaperDetail: "{time} · 尿尿{pee} · 便便{poo}",
+    times: "次", hour10: "10時", hour14: "14時", hour16: "16時", hour18: "18時", hour22: "22時", hour02: "02時", hour04: "04時", hour06: "06時",
+  },
+  en: {
+    age: "6 weeks 3 days (45 days)", home: "Home", stats: "Insights", settings: "Settings",
+    quickLog: "Quick log", current: "Now / Active", todayOverview: "Today", todayRange: "(00:00 to now)",
+    diaperLog: "Diaper log", nowTime: "Use current time", now: "Now", adjusted: "Adjusted", recording: "Saving...", recordDiaper: "Save diaper",
+    bottleLog: "Bottle prep", milkAmount: "Prepared milk", perBlock: "(30 ml per block)", startMilkTimer: "Start milk timer",
+    temperatureLog: "Temperature", latest: "Latest", recordTemperature: "Record temperature", temperature: "Temperature", time: "Time",
+    peeAmount: "Urine amount", pooAmount: "Stool amount", pee: "Urine", poo: "Stool", none: "None", small: "Small", medium: "Medium", large: "Large",
+    milkTimer: "Milk timer", noActiveMilk: "No active bottle", noActiveHelp: "A 60-minute timer appears here after bottle preparation",
+    milkTimerRunning: "Milk timer active", expired: "Expired", remainingTime: "Time remaining", preparedAmount: "Prepared", startTime: "Started",
+    validUntil: "Use by {time} (within 1 hour)", medicineGiven: "Medicine given", finishFeed: "Finish feeding",
+    drinkDuration: "Elapsed", confirmActual: "Confirm actual milk intake", fullFeed: "All", noMilk: "None", gaveMedicine: "Medicine given", confirmFeed: "Confirm feeding log",
+    recentLogs: "Recent logs", viewAll: "View all ›", noRecent: "No recent baby logs", diaperRecord: "Diaper log", feedingRecord: "Feeding log", temperatureRecord: "Temperature log",
+    actualMilk: "Actual milk", feeds: "{count} feeds", preparedMilk: "Prepared", leftover: "Left", past26: "Past 26 hours", average: "Average feed", sinceLastFeed: "Since last feed", timeline26: "26-hour timeline",
+    all: "All", feeding: "Feeding", diaper: "Diaper", refresh: "Refresh", showing: "Showing latest {count}", sheetsApi: "Writes to Google Sheets through Apps Script API", localCache: "Local cache", records: "{count} records", clearTimer: "Clear milk timer",
+    submitWait: "Saving. Do not close or switch pages.", submitFailed: "Could not save", retry: "Back and retry", gotIt: "Done", today: "Today", yesterday: "Yesterday", currentLabel: "Now",
+    justNow: "Just now", minutesAgo: "{minutes} min ago", hoursMinutesAgo: "{hours} hr {minutes} min ago", hoursAgo: "{hours} hr ago", minutesDuration: "{minutes} min", hoursMinutesDuration: "{hours} hr {minutes} min", hoursDuration: "{hours} hr",
+    refreshed: "Logs refreshed", refreshedDetail: "{count} baby logs", connectionFailed: "Connection failed", apiOffline: "Family OS API is offline",
+    missingAmount: "No amount selected", chooseOne: "Select at least one item", diaperSaving: "Saving diaper", diaperSuccess: "Diaper saved",
+    milkTimerStarted: "Milk timer started", feedSaving: "Saving feeding", feedSuccess: "Feeding saved", tempSaving: "Saving temperature", tempSuccess: "Temperature saved", timerCleared: "Milk timer cleared", localTimerRemoved: "Local timer removed",
+    switchLanguage: "切換至中文", settingsLabel: "Settings", close: "Close", checking: "Checking", saveFailed: "Save failed", noValue: "None",
+    startedDetail: "{ml} ml · started {time}{medicine}", medicineSuffix: " · medicine given", diaperDetail: "{time} · urine {pee} · stool {poo}",
+    times: "times", hour10: "10h", hour14: "14h", hour16: "16h", hour18: "18h", hour22: "22h", hour02: "02h", hour04: "04h", hour06: "06h",
+  },
+};
+
+const state = {
+  now: new Date(),
+  activeTab: "panel",
+  lang: localStorage.getItem(STORAGE_KEYS.language) === "en" ? "en" : "zh",
+  timelineFilter: "all",
+  apiStatus: { ok: null, text: "", textKey: "checking" },
+  logs: readJson(STORAGE_KEYS.logs, []),
+  saving: "",
+  notice: null,
+  noticeTimer: null,
+  submitFlow: null,
+  submitTimer: null,
+  temperatureOpen: false,
+  finishOpen: false,
+  actualMl: 120,
+  times: {
+    diaper: new Date(),
+    bottle: new Date(),
+    temperature: new Date(),
+  },
+  timeFollowing: { diaper: true, bottle: true, temperature: true },
+  diaper: { pee: "medium", poo: "none" },
+  preparedMl: 120,
+  medicineGiven: false,
+  temperature: 36.8,
+  activeBottle: readJson(STORAGE_KEYS.activeBottle, null),
+};
+
+const app = document.querySelector("#app");
+const notice = document.querySelector("#notice");
+const headerDate = document.querySelector("#header-date");
+const headerClock = document.querySelector("#header-clock");
+const headerAge = document.querySelector("#header-age");
+const languageButton = document.querySelector("#language-button");
+
+let lastTouchEnd = 0;
+let lastTouchTarget = null;
+document.addEventListener("touchend", (event) => {
+  if (event.changedTouches.length !== 1) return;
+  const now = Date.now();
+  const target = event.target.closest?.("button") || event.target;
+  if (now - lastTouchEnd < 300 && target === lastTouchTarget) event.preventDefault();
+  lastTouchEnd = now;
+  lastTouchTarget = target;
+}, { passive: false });
+
+document.addEventListener("click", handleClick);
+window.addEventListener("online", () => refreshData("online"));
+window.addEventListener("focus", () => refreshData("focus"));
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+}
+
+render();
+refreshData("load");
+setInterval(() => {
+  state.now = new Date();
+  render();
+}, 1000);
+
+function handleClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const { action } = button.dataset;
+
+  if (action === "tab") setTab(button.dataset.tab);
+  if (action === "toggle-language") toggleLanguage();
+  if (action === "refresh") refreshData("manual");
+  if (action === "time-step") adjustTime(button.dataset.scope, Number(button.dataset.minutes));
+  if (action === "time-now") setTimeNow(button.dataset.scope);
+  if (action === "set-intensity") setIntensity(button.dataset.kind, button.dataset.value);
+  if (action === "set-prepared-ml") setPreparedMl(Number(button.dataset.ml));
+  if (action === "toggle-medicine") toggleMedicine();
+  if (action === "toggle-active-medicine") toggleActiveMedicine();
+  if (action === "start-bottle") startBottle();
+  if (action === "open-finish") openFinishBottle();
+  if (action === "close-finish") closeFinishBottle();
+  if (action === "finish-step") setActualMl(state.actualMl + Number(button.dataset.delta));
+  if (action === "finish-full") setActualMl(activeBottlePreparedMl());
+  if (action === "set-actual-ml") setActualMl(Number(button.dataset.ml));
+  if (action === "save-feeding") saveFeeding();
+  if (action === "clear-bottle") clearActiveBottle(true);
+  if (action === "save-diaper") saveDiaper();
+  if (action === "open-temperature") openTemperature();
+  if (action === "close-temperature") closeTemperature();
+  if (action === "temp-step") setTemperature(state.temperature + Number(button.dataset.delta));
+  if (action === "save-temperature") saveTemperature();
+  if (action === "dismiss-submit") dismissSubmit();
+  if (action === "timeline-filter") setTimelineFilter(button.dataset.filter);
+}
+
+function render() {
+  document.documentElement.lang = state.lang === "en" ? "en" : "zh-Hant-HK";
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.tab === state.activeTab);
+  });
+
+  headerDate.textContent = formatHeaderDate(state.now);
+  headerClock.textContent = formatClock(state.now);
+  headerAge.textContent = t("age");
+  languageButton.textContent = state.lang === "en" ? "中" : "EN";
+  languageButton.setAttribute("aria-label", t("switchLanguage"));
+  document.querySelector('[data-tab="settings"]').setAttribute("aria-label", t("settingsLabel"));
+  document.querySelector(".bottom-nav").setAttribute("aria-label", t("home"));
+  document.querySelector("#nav-home").textContent = t("home");
+  document.querySelector("#nav-stats").textContent = t("stats");
+  document.querySelector("#nav-settings").textContent = t("settings");
+  renderNotice();
+
+  let page = renderPanel();
+  if (state.activeTab === "timeline") page = renderTimelinePage();
+  if (state.activeTab === "settings") page = renderSettingsPage();
+  app.innerHTML = `${page}${renderTemperatureModal()}${renderFeedingModal()}${renderSubmitOverlay()}`;
+}
+
+function renderNotice() {
+  if (!state.notice) {
+    notice.innerHTML = "";
+    notice.className = "notice";
+    return;
+  }
+  notice.className = `notice is-visible ${state.notice.type}`;
+  notice.innerHTML = `
+    ${iconHtml(state.notice.type === "error" ? "temp" : "check")}
+    <div>
+      <div class="notice-title">${escapeHtml(state.notice.title)}</div>
+      <div class="notice-detail">${escapeHtml(state.notice.detail)}</div>
+    </div>
+  `;
+}
+
+function renderPanel() {
+  return `
+    <div class="panel-grid">
+      <section class="column-panel">
+        <h2 class="panel-heading">${t("quickLog")}</h2>
+        ${renderDiaperCard()}
+        ${renderBottleCard()}
+        ${renderTemperatureCard()}
+      </section>
+      <section class="column-panel">
+        <h2 class="panel-heading">${t("current")}</h2>
+        ${renderNowCard()}
+        ${renderRecentCard(5)}
+      </section>
+      <section class="column-panel">
+        <h2 class="panel-heading">${t("todayOverview")} <span>${t("todayRange")}</span></h2>
+        ${renderInsightsCard()}
+      </section>
+    </div>
+  `;
+}
+
+function renderDiaperCard() {
+  return `
+    <section class="card card-pad diaper-card">
+      <div class="card-header">
+        <div class="card-title">${iconHtml("diaper")}<h2>${t("diaperLog")}</h2></div>
+        <button class="small-outline" type="button" data-action="time-now" data-scope="diaper">${t("nowTime")}</button>
+      </div>
+      ${renderTimeDisplay("diaper")}
+      ${renderTimeControls("diaper")}
+      ${renderIntensityControl("pee", state.diaper.pee)}
+      ${renderIntensityControl("poo", state.diaper.poo)}
+      <button class="primary-button cyan" type="button" data-action="save-diaper" ${savingAttr("diaper")}>
+        ${state.saving === "diaper" ? `<span class="button-spinner"></span>${t("recording")}` : `${iconHtml("check")}${t("recordDiaper")}`}
+      </button>
+    </section>
+  `;
+}
+
+function renderBottleCard() {
+  return `
+    <section class="card card-pad bottle-card">
+      <div class="card-header">
+        <div class="card-title">${iconHtml("bottle")}<h2>${t("bottleLog")}</h2></div>
+        <button class="small-outline" type="button" data-action="time-now" data-scope="bottle">${t("nowTime")}</button>
+      </div>
+      ${renderTimeDisplay("bottle")}
+      ${renderTimeControls("bottle")}
+      <p class="section-label">${t("milkAmount")} <span>${t("perBlock")}</span></p>
+      ${renderBottleMeter(state.preparedMl, "set-prepared-ml", 240, true)}
+      <div class="bottle-action-row">
+        <div class="bottle-total"><strong>${state.preparedMl}</strong><span>ml</span></div>
+        <button class="medication-toggle ${state.medicineGiven ? "is-selected" : ""}" type="button"
+          data-action="toggle-medicine" aria-pressed="${state.medicineGiven}" aria-label="${t("gaveMedicine")}">
+          ${iconHtml("medicine")}
+        </button>
+      </div>
+      <button class="primary-button" type="button" data-action="start-bottle">${iconHtml("bottle")}${t("startMilkTimer")}</button>
+    </section>
+  `;
+}
+
+function renderTemperatureCard() {
+  const metrics = computeMetrics("rolling");
+  return `
+    <section class="card temperature-card">
+      <div>
+        <div class="card-title">${iconHtml("temp")}<h2>${t("temperatureLog")}</h2></div>
+        <p class="temp-last">${t("latest")} ${metrics.lastTemp || "--"}${metrics.lastTempAt ? ` · ${formatClock(metrics.lastTempAt)}` : ""}</p>
+      </div>
+      <button class="temp-open-button" type="button" data-action="open-temperature">${t("recordTemperature")}</button>
+    </section>
+  `;
+}
+
+function renderTimeDisplay(scope) {
+  return `<div class="time-line"><strong class="time-chip">${formatClock(effectiveTime(scope))}</strong><span class="time-now">${state.timeFollowing[scope] ? t("now") : t("adjusted")}</span></div>`;
+}
+
+function renderTimeControls(scope) {
+  const steps = [[-30,"-30"],[-15,"-15"],[-5,"-5"],[-1,"-1"],[1,"+1"],[5,"+5"],[15,"+15"],[30,"+30"]];
+  return `<div class="step-row">${steps.map(([minutes,label]) => `
+    <button class="step-button" type="button" data-action="time-step" data-scope="${scope}" data-minutes="${minutes}">${label}</button>
+  `).join("")}</div>`;
+}
+
+function renderIntensityControl(kind, selected) {
+  const icon = kind === "poo" ? "poo" : "pee";
+  const values = ["none", "small", "medium", "large"];
+  return `
+    <div class="intensity-row">
+      ${iconHtml(icon)}
+      <div class="segmented-control" role="group" aria-label="${kind === "poo" ? t("pooAmount") : t("peeAmount")}">
+        ${values.map((value) => `
+          <button class="choice-button ${selected === value ? "is-selected" : ""}" type="button"
+            data-action="set-intensity" data-kind="${kind}" data-value="${value}"
+            aria-label="${kind === "poo" ? t("poo") : t("pee")} ${t(value)}">
+            <span class="amount-icon ${kind === "poo" ? "amount-poo" : ""} amount-${value}" aria-hidden="true"></span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderBottleMeter(selectedMl, action, maxMl, showIndex) {
+  const blocks = Math.max(1, Math.ceil(maxMl / 30));
+  return `<div class="bottle-meter" style="grid-template-columns:repeat(${blocks},minmax(0,1fr))">${Array.from({length:blocks},(_,index) => {
+    const ml = (index + 1) * 30;
+    return `<div class="bottle-slot"><button class="bottle-block ${selectedMl >= ml ? "is-filled" : ""}" type="button" data-action="${action}" data-ml="${ml}" aria-label="${ml} ml"></button>${showIndex ? `<span class="bottle-index">${index + 1}</span>` : ""}</div>`;
+  }).join("")}</div>`;
+}
+
+function renderNowCard() {
+  const bottle = currentBottle();
+  if (!bottle) {
+    return `<section class="card card-pad now-card"><div class="card-header"><div class="card-title">${iconHtml("bottle")}<div><h2>${t("milkTimer")}</h2><p class="meta">${t("noActiveMilk")}</p></div></div></div><div class="empty-state">${t("noActiveHelp")}</div></section>`;
+  }
+  const remaining = bottle.expiresAt.getTime() - state.now.getTime();
+  const progress = Math.max(0, Math.min(100, (remaining / 3600000) * 100));
+  const expiryClass = remaining <= 0 ? "danger" : remaining <= 10 * 60000 ? "warning" : "";
+  return `
+    <section class="card card-pad now-card">
+      <div class="card-header"><div class="card-title">${iconHtml("bottle")}<h2>${t("milkTimerRunning")}</h2></div></div>
+      <div class="active-bottle">
+        <div class="timer-value">${remaining <= 0 ? "-" : ""}${formatDuration(Math.abs(remaining))}</div>
+        <div class="timer-label">${remaining <= 0 ? t("expired") : t("remainingTime")}</div>
+        <div class="bottle-meta-grid">
+          <div class="bottle-meta"><span class="label">${t("preparedAmount")}</span><span class="value">${bottle.preparedMl} ml</span></div>
+          <div class="bottle-meta-divider"></div>
+          <div class="bottle-meta"><span class="label">${t("startTime")}</span><span class="value">${formatClock(bottle.preparedAt)}</span></div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="--progress:${progress}%"></div></div>
+        <p class="expiry-text ${expiryClass}">${t("validUntil", {time: formatClock(bottle.expiresAt)})}</p>
+        ${bottle.medicineGiven ? `<p class="medication-note">${iconHtml("medicine")}${t("medicineGiven")}</p>` : ""}
+        <button class="outline-button" type="button" data-action="open-finish">${iconHtml("check")}${t("finishFeed")}</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderFeedingModal() {
+  if (!state.finishOpen) return "";
+  const bottle = currentBottle();
+  if (!bottle) return "";
+  const maxMl = Math.max(30, bottle.preparedMl);
+  return `
+    <div class="modal-backdrop" role="presentation">
+      <section class="modal-card feeding-modal" role="dialog" aria-modal="true" aria-labelledby="feeding-title">
+        <div class="modal-header">
+          <h2 class="modal-title" id="feeding-title">${iconHtml("bottle")}${t("finishFeed")}</h2>
+          <button class="close-button" data-action="close-finish" aria-label="${t("close")}">×</button>
+        </div>
+        <div class="feeding-summary">
+          <div><span>${t("preparedAmount")}</span><strong>${bottle.preparedMl} ml</strong></div>
+          <div><span>${t("startTime")}</span><strong>${formatClock(bottle.preparedAt)}</strong></div>
+          <div><span>${t("drinkDuration")}</span><strong>${formatElapsed(bottle.preparedAt)}</strong></div>
+        </div>
+        <div class="modal-section">
+          <p class="modal-label">${t("confirmActual")}</p>
+          ${renderBottleMeter(state.actualMl,"set-actual-ml",maxMl,false)}
+          <div class="feeding-amount"><strong>${state.actualMl}</strong><span>ml</span></div>
+          <div class="finish-controls">
+            <button class="secondary-button" data-action="finish-step" data-delta="-5">-5</button>
+            <button class="secondary-button" data-action="finish-step" data-delta="5">+5</button>
+            <button class="secondary-button" data-action="finish-full">${t("fullFeed")}</button>
+            <button class="secondary-button" data-action="set-actual-ml" data-ml="0">${t("noMilk")}</button>
+          </div>
+          <button class="medication-toggle ${bottle.medicineGiven ? "is-selected" : ""}" type="button"
+            data-action="toggle-active-medicine" aria-pressed="${bottle.medicineGiven}" aria-label="${t("gaveMedicine")}">
+            ${iconHtml("medicine")}<span>${t("gaveMedicine")}</span>
+          </button>
+        </div>
+        <button class="primary-button" data-action="save-feeding" ${savingAttr("feeding")}>
+          ${state.saving === "feeding" ? `<span class="button-spinner"></span>${t("recording")}` : `${iconHtml("check")}${t("confirmFeed")}`}
+        </button>
+      </section>
+    </div>
+  `;
+}
+
+function renderRecentCard(limit) {
+  const logs = state.logs.slice(0,limit).map(normalizeLog);
+  return `<section class="recent-card"><div class="recent-header-row"><h2>${t("recentLogs")}</h2><button class="all-link" data-action="tab" data-tab="timeline">${t("viewAll")}</button></div>${logs.length ? `<div class="recent-list">${logs.map(renderRecentItem).join("")}</div>` : `<div class="empty-state">${t("noRecent")}</div>`}</section>`;
+}
+
+function renderRecentItem(log) {
+  const title = log.type === "diaper"
+    ? `<div class="recent-diaper-icons"><span class="amount-icon amount-${log.diaper.pee}" aria-label="${t("pee")} ${t(log.diaper.pee)}"></span><span class="amount-icon amount-poo amount-${log.diaper.poo}" aria-label="${t("poo")} ${t(log.diaper.poo)}"></span></div>`
+    : `${escapeHtml(log.title)}${log.medicineGiven ? iconHtml("medicine") : ""}`;
+  return `<article class="recent-item">${iconHtml(log.icon, log.utility)}<div><div class="recent-time">${formatClock(log.date)}</div><div class="age">${relativeAge(log.date)}</div></div><div><div class="recent-title">${title}</div><div class="recent-detail">${escapeHtml(log.detail)}</div></div><div class="row-chevron">›</div></article>`;
+}
+
+function renderInsightsCard() {
+  const today = computeMetrics("today");
+  const rolling = computeMetrics("rolling");
+  const donut = today.preparedMilk ? Math.min(100,Math.round(today.actualMilk / today.preparedMilk * 100)) : 0;
+  return `
+    <section class="insight-card">
+      <div class="overview-card today">
+        <div class="milk-summary"><div class="hero-stat"><div class="label">${t("actualMilk")}</div><div class="value">${today.actualMilk}<span> ml</span></div><div class="sub">${t("feeds", {count: today.feedCount})}</div></div><div class="donut-wrap"><div class="donut" style="--donut:${donut}%"></div><div class="legend"><div class="legend-row"><span class="legend-dot"></span><span>${t("preparedMilk")}</span><strong>${today.preparedMilk} ml</strong></div><div class="legend-row"><span class="legend-dot soft"></span><span>${t("leftover")}</span><strong>${Math.max(0,today.preparedMilk-today.actualMilk)} ml</strong></div></div></div></div>
+        <div class="stat-grid">
+          <div class="stat-cell" aria-label="${t("pee")} ${today.peeCount} ${t("times")}">${iconHtml("pee")}<span class="value">${today.peeCount}<small> ${t("times")}</small></span></div>
+          <div class="stat-cell" aria-label="${t("poo")} ${today.pooCount} ${t("times")}">${iconHtml("poo")}<span class="value">${today.pooCount}<small> ${t("times")}</small></span></div>
+          <div class="stat-cell" aria-label="${t("latest")} ${t("temperature")} ${today.lastTemp || t("noValue")}">${iconHtml("temp")}<span class="value">${today.lastTemp || "--"}</span><span class="meta">${today.lastTempAt ? formatClock(today.lastTempAt) : ""}</span></div>
+        </div>
+      </div>
+      <div class="overview-card rolling">
+        <h2 class="panel-heading">${t("past26")} <span>(${formatRangeLabel(rolling.start,state.now)})</span></h2>
+        <div class="rolling-grid"><div class="hero-stat"><div class="value">${rolling.actualMilk}<span> ml</span></div><div class="sub">${t("feeds", {count: rolling.feedCount})}</div></div>${renderBarChart(rolling.start,state.now)}</div>
+        <div class="mini-stat-row"><div><p class="mini-label">${t("average")}</p><p class="meta"><strong>${rolling.avgFeed}</strong> ml</p><p class="mini-label" style="margin-top:7px">${t("sinceLastFeed")}</p><p class="meta"><strong>${rolling.lastFeed ? relativeAge(rolling.lastFeed) : "--"}</strong></p></div><div class="stacked-stats"><div class="stacked-row">${iconHtml("pee")}<span class="visually-hidden">${t("pee")}</span><strong>${rolling.peeCount} ${t("times")}</strong></div><div class="stacked-row">${iconHtml("poo")}<span class="visually-hidden">${t("poo")}</span><strong>${rolling.pooCount} ${t("times")}</strong></div></div></div>
+      </div>
+      <div class="overview-card rhythm"><h2 class="panel-heading">${t("timeline26")}</h2>${renderRhythm(rolling.start,state.now)}</div>
+    </section>
+  `;
+}
+
+function renderBarChart(start,end) {
+  const bars = buildHourlyBars(start,end,18);
+  return `<div><div class="bar-chart">${bars.map(height => `<span class="bar" style="height:${height}%"></span>`).join("")}</div><div class="chart-labels"><span>${t("hour10")}</span><span>${t("hour16")}</span><span>${t("hour22")}</span><span>${t("hour04")}</span><span>${t("hour10")}</span><span>${t("currentLabel")}</span></div></div>`;
+}
+
+function renderRhythm(start,end) {
+  const span = end.getTime() - start.getTime();
+  const dots = state.logs.map(normalizeLog).filter(log => log.date >= start && log.date <= end).slice(0,20).map(log => {
+    const left = ((log.date.getTime()-start.getTime())/span)*100;
+    return `<span class="rhythm-dot" style="left:${left}%">${iconHtml(log.icon,log.utility)}<span class="rhythm-stem"></span></span>`;
+  }).join("");
+  return `<div><div class="rhythm-track"><div class="rhythm-line"></div>${dots}</div><div class="timeline-labels"><span>${t("hour10")}</span><span>${t("hour14")}</span><span>${t("hour18")}</span><span>${t("hour22")}</span><span>${t("hour02")}</span><span>${t("hour06")}</span><span>${t("hour10")}</span><span>${t("currentLabel")}</span></div></div>`;
+}
+
+function renderTemperatureModal() {
+  if (!state.temperatureOpen) return "";
+  return `<div class="modal-backdrop" role="presentation"><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="temperature-title"><div class="modal-header"><h2 class="modal-title" id="temperature-title">${iconHtml("temp")}${t("recordTemperature")}</h2><button class="close-button" data-action="close-temperature" aria-label="${t("close")}">×</button></div><div class="modal-section"><p class="modal-label">${t("time")}</p><div class="modal-time">${formatClock(effectiveTime("temperature"))} <span class="time-now">${state.timeFollowing.temperature ? t("now") : t("adjusted")}</span></div>${renderTimeControls("temperature")}</div><div class="modal-section"><p class="modal-label">${t("temperature")}</p><div class="temp-display">${state.temperature.toFixed(1)}<span>°C</span></div><div class="temp-step-row"><button class="secondary-button" data-action="temp-step" data-delta="-0.5">-0.5</button><button class="secondary-button" data-action="temp-step" data-delta="-0.1">-0.1</button><button class="secondary-button" data-action="temp-step" data-delta="0.1">+0.1</button><button class="secondary-button" data-action="temp-step" data-delta="0.5">+0.5</button></div></div><button class="primary-button pink" data-action="save-temperature" ${savingAttr("temperature")}>${iconHtml("temp")}${t("recordTemperature")}</button></section></div>`;
+}
+
+function renderSubmitOverlay() {
+  const flow = state.submitFlow;
+  if (!flow) return "";
+  if (flow.status === "saving") {
+    return `<div class="submit-backdrop"><section class="submit-card" role="dialog" aria-modal="true" aria-live="polite"><h2>${escapeHtml(flow.savingTitle)}</h2><div class="submit-symbol">${iconHtml(flow.icon)}</div><p class="submit-helper">${t("submitWait")}</p></section></div>`;
+  }
+  if (flow.status === "error") {
+    return `<div class="submit-backdrop"><section class="submit-card error" role="dialog" aria-modal="true"><h2>${t("submitFailed")}</h2><div class="submit-symbol">!</div><p class="submit-detail">${escapeHtml(flow.detail)}</p><button class="outline-button" data-action="dismiss-submit">${t("retry")}</button></section></div>`;
+  }
+  const label = flow.countdown ? `${t("gotIt")} (${flow.countdown})` : t("gotIt");
+  return `<div class="submit-backdrop"><section class="submit-card success" role="dialog" aria-modal="true" aria-live="polite"><h2>${escapeHtml(flow.successTitle)}</h2><div class="submit-symbol">${iconHtml("check")}</div><p class="submit-detail">${escapeHtml(flow.detail)}</p><button class="outline-button" data-action="dismiss-submit">${label}</button></section></div>`;
+}
+
+function renderTimelinePage() {
+  const filtered = state.logs.map(normalizeLog).filter(log => state.timelineFilter === "all" || log.type === state.timelineFilter).slice(0,10);
+  const filters = [["all",t("all")],["feeding",t("feeding")],["diaper",t("diaper")],["temperature",t("temperature")]];
+  return `<div class="timeline-page"><section class="card card-pad"><div class="timeline-toolbar"><div><h2>${t("stats")}</h2><p class="meta">${t("showing", {count: filtered.length})}</p></div><div class="filter-row">${filters.map(([value,label]) => `<button class="filter-button ${state.timelineFilter === value ? "is-selected" : ""}" data-action="timeline-filter" data-filter="${value}">${label}</button>`).join("")}<button class="filter-button" data-action="refresh">${t("refresh")}</button></div></div><div class="recent-list">${filtered.map(renderRecentItem).join("")}</div></section></div>`;
+}
+
+function renderSettingsPage() {
+  const bottle = currentBottle();
+  const statusText = state.apiStatus.textKey ? t(state.apiStatus.textKey) : state.apiStatus.text;
+  return `<div class="settings-page"><section class="card card-pad"><div class="card-header"><div class="card-title">${iconHtml("settings",true)}<div><h2>${t("settings")}</h2><p class="meta">${t("sheetsApi")}</p></div></div><button class="secondary-button" data-action="refresh">${t("refresh")}</button></div><div class="settings-grid"><div class="stat-cell"><span class="label">API</span><span class="status-badge ${state.apiStatus.ok ? "ok" : "error"}">${escapeHtml(statusText)}</span></div><div class="stat-cell"><span class="label">${t("localCache")}</span><span class="value">${t("records", {count: state.logs.length})}</span></div><div class="stat-cell"><span class="label">${t("milkTimer")}</span><span class="value">${bottle ? `${bottle.preparedMl} ml` : "--"}</span></div></div><div class="filter-row" style="margin-top:14px"><button class="secondary-button" data-action="clear-bottle">${t("clearTimer")}</button></div></section></div>`;
+}
+
+async function refreshData(reason) {
+  try {
+    const health = await getHealth();
+    state.apiStatus = { ok:true, text:`${health.household_id || "hh_home"} · ${health.schema_version || "schema ok"}`, textKey:"" };
+    const logs = await callApi("get_recent_baby_logs",{limit:100},"iPad BB App refresh");
+    state.logs = Array.isArray(logs) ? logs : [];
+    localStorage.setItem(STORAGE_KEYS.logs,JSON.stringify(state.logs));
+    if (reason === "manual") showNotice(t("refreshed"),t("refreshedDetail", {count: state.logs.length}),"success");
+  } catch (error) {
+    state.apiStatus = {ok:false,text:"API offline",textKey:""};
+    if (reason !== "load" || !state.logs.length) showNotice(t("connectionFailed"),error.message || t("apiOffline"),"error");
+  } finally { render(); }
+}
+
+async function getHealth() {
+  const response = await fetch("/api/health",{cache:"no-store"});
+  const data = await response.json();
+  if (!response.ok || data.ok !== true) throw new Error(data.error || "Health check failed");
+  return data.result || {};
+}
+
+async function callApi(action,payload,requestText) {
+  const response = await fetch("/api/family-os",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action,payload,request_text:requestText})});
+  const data = await response.json();
+  if (!response.ok || data.ok !== true) throw new Error(data.error || "Family OS API request failed");
+  return data.result;
+}
+
+async function runSave(key,requestText,payload,afterSave,display) {
+  if (state.saving) return;
+  window.clearInterval(state.submitTimer);
+  state.saving = key;
+  state.submitFlow = {status:"saving",icon:display.icon,savingTitle:display.savingTitle,kind:key};
+  render();
+  try {
+    const result = await callApi("append_baby_log",payload,requestText);
+    afterSave?.(result);
+    state.saving = "";
+    state.submitFlow = {status:"success",icon:"check",successTitle:display.successTitle,detail:display.detail,countdown:key === "temperature" ? 2 : 0,kind:key};
+    render();
+    if (key === "temperature") scheduleSubmitDismiss();
+    await refreshData("save");
+  } catch (error) {
+    state.saving = "";
+    state.submitFlow = {status:"error",detail:error.message || t("saveFailed"),kind:key};
+    render();
+  }
+}
+
+function saveDiaper() {
+  const {pee,poo} = state.diaper;
+  if (pee === "none" && poo === "none") { showNotice(t("missingAmount"),t("chooseOne"),"error"); return; }
+  const eventAt = new Date(effectiveTime("diaper"));
+  const time = formatClock(eventAt);
+  const readable = `尿尿 ${intensityLabels[pee].long}; 便便 ${intensityLabels[poo].long}`;
+  const payload = {event_at:toHongKongTimestamp(eventAt),log_type:"diaper",log_subtype:"pee_poo",description:`BB 換片: ${readable}`,value_text:JSON.stringify({pee,poo}),remarks:"Recorded through iPad BB App"};
+  runSave("diaper",`iPad BB App 換片: ${readable}`,payload,() => { resetTimeFollowing("diaper"); state.diaper = {pee:"medium",poo:"none"}; },{icon:"diaper",savingTitle:t("diaperSaving"),successTitle:t("diaperSuccess"),detail:t("diaperDetail", {time, pee:t(pee), poo:t(poo)})});
+}
+
+function startBottle() {
+  const preparedAt = new Date(effectiveTime("bottle"));
+  const bottle = {id:`local_${preparedAt.getTime()}`,preparedMl:state.preparedMl,medicineGiven:state.medicineGiven,preparedAt:preparedAt.toISOString(),expiresAt:new Date(preparedAt.getTime()+3600000).toISOString()};
+  state.activeBottle = bottle; state.finishOpen = false; state.actualMl = bottle.preparedMl;
+  localStorage.setItem(STORAGE_KEYS.activeBottle,JSON.stringify(bottle));
+  showNotice(t("milkTimerStarted"),t("startedDetail", {ml:bottle.preparedMl,time:formatClock(preparedAt),medicine:bottle.medicineGiven ? t("medicineSuffix") : ""}),"success");
+  resetTimeFollowing("bottle"); state.medicineGiven = false; render();
+}
+
+function saveFeeding() {
+  const bottle = currentBottle(); if (!bottle) return;
+  const finishedAt = new Date();
+  const remarks = ["Recorded through iPad BB App",`prepared_ml=${bottle.preparedMl}`,`actual_ml=${state.actualMl}`,`medicine_given=${bottle.medicineGiven ? "true" : "false"}`,`prepared_at=${toHongKongTimestamp(bottle.preparedAt)}`,`expires_at=${toHongKongTimestamp(bottle.expiresAt)}`].join("; ");
+  const payload = {event_at:toHongKongTimestamp(bottle.preparedAt),started_at:toHongKongTimestamp(bottle.preparedAt),ended_at:toHongKongTimestamp(finishedAt),log_type:"feeding",log_subtype:"formula_milk",value_number:state.actualMl,unit:"ml",remarks};
+  const detail = `${state.actualMl} / ${bottle.preparedMl} ml · ${formatClock(bottle.preparedAt)}${bottle.medicineGiven ? t("medicineSuffix") : ""}`;
+  runSave("feeding",`iPad BB App 完成飲奶: 沖奶 ${bottle.preparedMl} ml, 實飲 ${state.actualMl} ml${bottle.medicineGiven ? ", 有餵藥" : ""}`,payload,() => clearActiveBottle(false),{icon:"bottle",savingTitle:t("feedSaving"),successTitle:t("feedSuccess"),detail});
+}
+
+function saveTemperature() {
+  const value = Number(state.temperature.toFixed(1));
+  const eventAt = new Date(effectiveTime("temperature"));
+  const time = formatClock(eventAt);
+  const payload = {event_at:toHongKongTimestamp(eventAt),log_type:"temperature",log_subtype:"body",description:`BB 探熱 ${value.toFixed(1)}°C`,value_number:value,unit:"celsius",remarks:"Recorded through iPad BB App"};
+  runSave("temperature",`iPad BB App 探熱 ${value.toFixed(1)}°C`,payload,() => { resetTimeFollowing("temperature"); },{icon:"temp",savingTitle:t("tempSaving"),successTitle:t("tempSuccess"),detail:`${value.toFixed(1)}°C · ${time}`});
+}
+
+function scheduleSubmitDismiss() {
+  window.clearInterval(state.submitTimer);
+  state.submitTimer = window.setInterval(() => {
+    if (!state.submitFlow || state.submitFlow.kind !== "temperature") { window.clearInterval(state.submitTimer); return; }
+    state.submitFlow.countdown -= 1;
+    if (state.submitFlow.countdown <= 0) dismissSubmit(); else render();
+  },1000);
+}
+
+function dismissSubmit() {
+  if (state.submitFlow?.status === "saving") return;
+  const kind = state.submitFlow?.kind;
+  window.clearInterval(state.submitTimer);
+  state.submitFlow = null;
+  if (kind === "temperature") state.temperatureOpen = false;
+  render();
+}
+
+function openTemperature() { state.temperatureOpen = true; resetTimeFollowing("temperature"); render(); }
+function closeTemperature() { if (!state.saving) { state.temperatureOpen = false; render(); } }
+function openFinishBottle() {
+  const bottle = currentBottle();
+  if (!bottle) return;
+  window.clearTimeout(state.noticeTimer);
+  state.notice = null;
+  state.finishOpen = true;
+  state.actualMl = Math.min(state.actualMl || bottle.preparedMl,bottle.preparedMl);
+  render();
+}
+function closeFinishBottle() { state.finishOpen = false; render(); }
+function clearActiveBottle(notifyUser) { state.activeBottle = null; state.finishOpen = false; state.actualMl = state.preparedMl; localStorage.removeItem(STORAGE_KEYS.activeBottle); if (notifyUser) showNotice(t("timerCleared"),t("localTimerRemoved"),"success"); render(); }
+function setTab(tab) { state.activeTab = tab; render(); }
+function adjustTime(scope,minutes) { state.times[scope] = new Date(effectiveTime(scope).getTime()+minutes*60000); state.timeFollowing[scope] = false; render(); }
+function setTimeNow(scope) { resetTimeFollowing(scope); render(); }
+function setIntensity(kind,value) { state.diaper[kind] = value; render(); }
+function setPreparedMl(value) { state.preparedMl = clamp(value,30,240); render(); }
+function toggleMedicine() { state.medicineGiven = !state.medicineGiven; render(); }
+function toggleActiveMedicine() {
+  if (!state.activeBottle) return;
+  state.activeBottle.medicineGiven = !Boolean(state.activeBottle.medicineGiven);
+  localStorage.setItem(STORAGE_KEYS.activeBottle,JSON.stringify(state.activeBottle));
+  render();
+}
+function setActualMl(value) { state.actualMl = clamp(Math.round(value/5)*5,0,activeBottlePreparedMl()); render(); }
+function setTemperature(value) { state.temperature = clamp(Math.round(value*10)/10,34,42); render(); }
+function setTimelineFilter(filter) { state.timelineFilter = filter; render(); }
+function toggleLanguage() { state.lang = state.lang === "zh" ? "en" : "zh"; localStorage.setItem(STORAGE_KEYS.language,state.lang); render(); }
+function effectiveTime(scope) { return state.timeFollowing[scope] ? state.now : state.times[scope]; }
+function resetTimeFollowing(scope) { state.timeFollowing[scope] = true; state.times[scope] = new Date(); }
+
+function currentBottle() { if (!state.activeBottle) return null; return {...state.activeBottle,preparedAt:new Date(state.activeBottle.preparedAt),expiresAt:new Date(state.activeBottle.expiresAt)}; }
+function activeBottlePreparedMl() { return currentBottle()?.preparedMl || state.preparedMl; }
+
+function normalizeLog(raw) {
+  const date = parseTimestamp(raw.event_at) || new Date();
+  const type = String(raw.log_type || "other");
+  const preparedMl = parseNumberFromRemarks(raw.remarks,"prepared_ml");
+  const medicineGiven = parseBooleanFromRemarks(raw.remarks,"medicine_given");
+  const diaper = parseDiaper(raw);
+  let icon = "calendar", utility = true, title = raw.description || type, detail = raw.description || "";
+  if (type === "feeding") { icon = "bottle"; utility = false; const actual = Number(raw.value_number || 0); title = preparedMl ? `${actual} / ${preparedMl} ml` : `${actual} ml`; detail = t("feedingRecord"); }
+  if (type === "diaper") { icon = diaper.poo !== "none" ? "poo" : "pee"; utility = false; title = t("diaper"); detail = t("diaperRecord"); }
+  if (type === "temperature") { icon = "temp"; utility = false; title = `${Number(raw.value_number || 0).toFixed(1)}°C`; detail = t("temperatureRecord"); }
+  return {id:raw.baby_log_id || "",raw,date,type,icon,utility,title,detail,preparedMl,medicineGiven,diaper};
+}
+
+function parseDiaper(log) {
+  try { const parsed = JSON.parse(log.value_text || ""); return {pee:parsed.pee || "none",poo:parsed.poo || "none"}; }
+  catch { const text = `${log.description || ""} ${log.value_text || ""}`.toLowerCase(); return {pee:parseIntensityFromText(text,"pee") || "none",poo:parseIntensityFromText(text,"poo") || parseIntensityFromText(text,"stool") || "none"}; }
+}
+
+function parseIntensityFromText(text,key) {
+  const match = new RegExp(`${key}\\s*[:= ]\\s*(none|small|medium|large|無|少|中|多|少量|中量|多量)`,"i").exec(text);
+  if (!match) return ""; const value = match[1];
+  if (value === "無") return "none"; if (value === "少" || value === "少量") return "small"; if (value === "中" || value === "中量") return "medium"; if (value === "多" || value === "多量") return "large"; return value.toLowerCase();
+}
+
+function computeMetrics(mode) {
+  const now = state.now; const start = mode === "today" ? startOfHongKongDay(now) : new Date(now.getTime()-26*3600000);
+  const logs = state.logs.map(normalizeLog).filter(log => log.date >= start && log.date <= now);
+  let actualMilk=0,preparedMilk=0,feedCount=0,peeCount=0,pooCount=0,lastTemp="",lastTempAt=null,lastFeed=null;
+  for (const log of logs) {
+    if (log.type === "feeding") { const actual=Number(log.raw.value_number || 0); actualMilk+=actual; preparedMilk+=log.preparedMl || actual; feedCount+=1; if (!lastFeed || log.date>lastFeed) lastFeed=log.date; }
+    if (log.type === "diaper") { if (log.diaper.pee !== "none") peeCount+=1; if (log.diaper.poo !== "none") pooCount+=1; }
+    if (log.type === "temperature" && (!lastTempAt || log.date>lastTempAt)) { lastTemp=`${Number(log.raw.value_number || 0).toFixed(1)}°C`; lastTempAt=log.date; }
+  }
+  return {start,actualMilk,preparedMilk,feedCount,peeCount,pooCount,lastTemp,lastTempAt,lastFeed,avgFeed:feedCount ? Math.round(actualMilk/feedCount) : 0};
+}
+
+function buildHourlyBars(start,end,count) {
+  const span=end.getTime()-start.getTime(); const bins=Array.from({length:count},()=>0);
+  state.logs.map(normalizeLog).forEach(log => { if (log.type !== "feeding" || log.date<start || log.date>end) return; const index=Math.min(count-1,Math.floor(((log.date.getTime()-start.getTime())/span)*count)); bins[index]+=Number(log.raw.value_number || 0); });
+  const max=Math.max(...bins,1); return bins.map(value => Math.max(5,Math.round(value/max*86)));
+}
+
+function iconHtml(name,utility=false) { return `<span class="app-icon ${utility ? "utility-icon" : "event-icon"} icon-${name}" aria-hidden="true"></span>`; }
+function toHongKongTimestamp(date) { const p=dateParts(date,{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}); return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}+08:00`; }
+function startOfHongKongDay(date) { const p=dateParts(date,{year:"numeric",month:"2-digit",day:"2-digit"}); return parseTimestamp(`${p.year}-${p.month}-${p.day} 00:00:00+08:00`); }
+function dateParts(date,options) { return Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:HK_TZ,...options}).formatToParts(date).filter(part => part.type !== "literal").map(part => [part.type,part.value])); }
+function formatClock(date) { return new Intl.DateTimeFormat("en-GB",{timeZone:HK_TZ,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(date); }
+function formatHeaderDate(date) {
+  if (state.lang === "en") return new Intl.DateTimeFormat("en-GB",{timeZone:HK_TZ,day:"numeric",month:"short",weekday:"short"}).format(date);
+  const p=Object.fromEntries(new Intl.DateTimeFormat("zh-Hant-HK",{timeZone:HK_TZ,month:"numeric",day:"numeric",weekday:"long"}).formatToParts(date).filter(part => part.type !== "literal").map(part => [part.type,part.value]));
+  return `${p.month}月${p.day}日（${p.weekday}）`;
+}
+function formatRangeLabel(start,end) { return `${relativeDayLabel(start)} ${formatClock(start)} → ${relativeDayLabel(end)} ${formatClock(end)}`; }
+function relativeDayLabel(date) { const day=startOfHongKongDay(date).getTime(),today=startOfHongKongDay(state.now).getTime(); if (day===today) return t("today"); if (day===today-86400000) return t("yesterday"); const p=dateParts(date,{month:"numeric",day:"numeric"}); return `${p.month}/${p.day}`; }
+function parseTimestamp(value) { if (!value) return null; if (value instanceof Date) return value; const date=new Date(String(value).replace(" ","T")); return Number.isNaN(date.getTime()) ? null : date; }
+function formatDuration(ms) { const total=Math.max(0,Math.floor(ms/1000)); return `${String(Math.floor(total/60)).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`; }
+function relativeAge(date) { const minutes=Math.floor(Math.max(0,state.now-date)/60000); if (minutes<1) return t("justNow"); if (minutes<60) return t("minutesAgo",{minutes}); const hours=Math.floor(minutes/60),rest=minutes%60; return rest ? t("hoursMinutesAgo",{hours,minutes:rest}) : t("hoursAgo",{hours}); }
+function formatElapsed(date) { const minutes=Math.floor(Math.max(0,state.now-date)/60000); if (minutes<1) return t("justNow"); if (minutes<60) return t("minutesDuration",{minutes}); const hours=Math.floor(minutes/60),rest=minutes%60; return rest ? t("hoursMinutesDuration",{hours,minutes:rest}) : t("hoursDuration",{hours}); }
+function parseNumberFromRemarks(remarks,key) { const match=new RegExp(`${key}=([0-9]+(?:\\.[0-9]+)?)`).exec(String(remarks || "")); return match ? Number(match[1]) : 0; }
+function parseBooleanFromRemarks(remarks,key) { const match=new RegExp(`${key}=(true|false)`,"i").exec(String(remarks || "")); return match ? match[1].toLowerCase() === "true" : false; }
+function savingAttr(key) { return state.saving === key ? "disabled" : ""; }
+function clamp(value,min,max) { return Math.max(min,Math.min(max,value)); }
+function showNotice(title,detail,type="success") { window.clearTimeout(state.noticeTimer); state.notice={title,detail,type}; state.noticeTimer=window.setTimeout(() => { state.notice=null; render(); },2400); render(); }
+function t(key,vars={}) { const template=I18N[state.lang]?.[key] ?? I18N.zh[key] ?? key; return String(template).replace(/\{(\w+)\}/g,(_,name) => vars[name] ?? `{${name}}`); }
+function readJson(key,fallback) { try { const value=localStorage.getItem(key); return value ? JSON.parse(value) : fallback; } catch { return fallback; } }
+function escapeHtml(value) { return String(value ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }

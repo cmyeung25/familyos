@@ -6,6 +6,7 @@ Family OS is a household assistant workspace built around a Telegram bot, an LLM
 
 - `family-os-telegram-bot/`: Telegram bot runtime, LLM bridge, reminder worker
 - `family-os-apps-script/`: Apps Script Web App backend for audited reads and writes
+- `family-os-bb-ipad-webapp/`: iPad add-to-home-screen BB logging PWA and thin API proxy
 - `plugins-staging/`: staged skills and runtime references used by the Telegram BB + inventory flow
 - `instances/example/`: Phase 1 multi-instance config scaffold
 
@@ -80,6 +81,12 @@ Synology + Uptime Kuma monitoring is now scaffolded with:
 - `docker/health_server.mjs`
 - `docker-compose.monitoring.example.yml`
 - `docs/synology-uptime-monitoring.md`
+
+The BB iPad PWA has its own isolated NAS service and deployment guide:
+
+- `docker-compose.bb-ipad.yml`
+- `scripts/synology/deploy-bb-ipad.sh`
+- `docs/synology-bb-ipad-deployment.md`
 
 ## Shared Planning Docs
 
