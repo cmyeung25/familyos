@@ -25,7 +25,7 @@ const I18N = {
     validUntil: "有效期至 {time}（1 小時內飲用）", medicineGiven: "今次有餵藥", finishFeed: "完成飲奶",
     drinkDuration: "飲用時間", confirmActual: "確認實際飲奶量", fullFeed: "全飲", noMilk: "無飲", gaveMedicine: "餵藥", confirmFeed: "確認飲奶紀錄",
     recentLogs: "最近記錄", viewAll: "查看全部 ›", noRecent: "未有最近 BB 紀錄", diaperRecord: "換片記錄", feedingRecord: "飲奶記錄", temperatureRecord: "體溫記錄",
-    actualMilk: "實際奶量", feeds: "{count} 次餵奶", preparedMilk: "沖奶量", leftover: "剩餘", past26: "過去 26 小時", average: "平均每次", sinceLastFeed: "距離上次餵奶", timeline26: "26 小時時間軸",
+    actualMilk: "實際奶量", feeds: "{count} 次餵奶", preparedMilk: "沖奶量", leftover: "剩餘", past26: "過去 26 小時", average: "平均每次", sinceLastFeed: "距離上次餵奶", lastFeedHeader: "上次餵奶", noFeedYet: "未有餵奶記錄", timeline26: "26 小時時間軸",
     all: "全部", feeding: "飲奶", diaper: "換片", refresh: "刷新", showing: "顯示最新 {count} 筆", sheetsApi: "Google Sheets 經 Apps Script API 寫入", localCache: "本機快取", records: "{count} 筆", clearTimer: "清除沖奶計時",
     submitWait: "記錄中，請勿關閉或切換頁面", submitFailed: "未能提交紀錄", retry: "返回再試", gotIt: "知道了", today: "今日", yesterday: "昨日", currentLabel: "現在",
     justNow: "剛剛", minutesAgo: "{minutes} 分鐘前", hoursMinutesAgo: "{hours} 小時 {minutes} 分鐘前", hoursAgo: "{hours} 小時前", minutesDuration: "{minutes} 分鐘", hoursMinutesDuration: "{hours} 小時 {minutes} 分鐘", hoursDuration: "{hours} 小時",
@@ -52,7 +52,7 @@ const I18N = {
     validUntil: "Use by {time} (within 1 hour)", medicineGiven: "Medicine given", finishFeed: "Finish feeding",
     drinkDuration: "Elapsed", confirmActual: "Confirm actual milk intake", fullFeed: "All", noMilk: "None", gaveMedicine: "Medicine given", confirmFeed: "Confirm feeding log",
     recentLogs: "Recent logs", viewAll: "View all ›", noRecent: "No recent baby logs", diaperRecord: "Diaper log", feedingRecord: "Feeding log", temperatureRecord: "Temperature log",
-    actualMilk: "Actual milk", feeds: "{count} feeds", preparedMilk: "Prepared", leftover: "Left", past26: "Past 26 hours", average: "Average feed", sinceLastFeed: "Since last feed", timeline26: "26-hour timeline",
+    actualMilk: "Actual milk", feeds: "{count} feeds", preparedMilk: "Prepared", leftover: "Left", past26: "Past 26 hours", average: "Average feed", sinceLastFeed: "Since last feed", lastFeedHeader: "Last feed", noFeedYet: "No feeding record", timeline26: "26-hour timeline",
     all: "All", feeding: "Feeding", diaper: "Diaper", refresh: "Refresh", showing: "Showing latest {count}", sheetsApi: "Writes to Google Sheets through Apps Script API", localCache: "Local cache", records: "{count} records", clearTimer: "Clear milk timer",
     submitWait: "Saving. Do not close or switch pages.", submitFailed: "Could not save", retry: "Back and retry", gotIt: "Done", today: "Today", yesterday: "Yesterday", currentLabel: "Now",
     justNow: "Just now", minutesAgo: "{minutes} min ago", hoursMinutesAgo: "{hours} hr {minutes} min ago", hoursAgo: "{hours} hr ago", minutesDuration: "{minutes} min", hoursMinutesDuration: "{hours} hr {minutes} min", hoursDuration: "{hours} hr",
@@ -103,6 +103,10 @@ const notice = document.querySelector("#notice");
 const headerDate = document.querySelector("#header-date");
 const headerClock = document.querySelector("#header-clock");
 const headerAge = document.querySelector("#header-age");
+const lastFeedGlance = document.querySelector("#last-feed-glance");
+const headerLastFeedLabel = document.querySelector("#header-last-feed-label");
+const headerLastFeedTime = document.querySelector("#header-last-feed-time");
+const headerLastFeedElapsed = document.querySelector("#header-last-feed-elapsed");
 const languageButton = document.querySelector("#language-button");
 
 let lastTouchEnd = 0;
@@ -184,6 +188,11 @@ function render() {
   headerDate.textContent = formatHeaderDate(state.now);
   headerClock.textContent = formatClock(state.now);
   headerAge.textContent = t("age");
+  const lastFeed = latestFeeding();
+  headerLastFeedLabel.textContent = t("lastFeedHeader");
+  headerLastFeedTime.textContent = lastFeed ? formatClock(lastFeed.date) : "--:--";
+  headerLastFeedElapsed.textContent = lastFeed ? relativeAge(lastFeed.date) : t("noFeedYet");
+  lastFeedGlance.setAttribute("aria-label", `${t("lastFeedHeader")}: ${lastFeed ? `${formatClock(lastFeed.date)}, ${relativeAge(lastFeed.date)}` : t("noFeedYet")}`);
   languageButton.textContent = state.lang === "en" ? "中" : "EN";
   languageButton.setAttribute("aria-label", t("switchLanguage"));
   document.querySelector('[data-tab="settings"]').setAttribute("aria-label", t("settingsLabel"));
@@ -430,7 +439,7 @@ function renderInsightsCard() {
       <div class="overview-card rolling">
         <h2 class="panel-heading">${t("past26")} <span>(${formatRangeLabel(rolling.start,state.now)})</span></h2>
         <div class="rolling-grid"><div class="hero-stat"><div class="value">${rolling.actualMilk}<span> ml</span></div><div class="sub">${t("feeds", {count: rolling.feedCount})}</div></div>${renderBarChart(rolling.start,state.now)}</div>
-        <div class="mini-stat-row"><div><p class="mini-label">${t("average")}</p><p class="meta"><strong>${rolling.avgFeed}</strong> ml</p><p class="mini-label" style="margin-top:7px">${t("sinceLastFeed")}</p><p class="meta"><strong>${rolling.lastFeed ? relativeAge(rolling.lastFeed) : "--"}</strong></p></div><div class="stacked-stats"><div class="stacked-row">${iconHtml("pee")}<span class="visually-hidden">${t("pee")}</span><strong>${rolling.peeCount} ${t("times")}</strong></div><div class="stacked-row">${iconHtml("poo")}<span class="visually-hidden">${t("poo")}</span><strong>${rolling.pooCount} ${t("times")}</strong></div></div></div>
+        <div class="mini-stat-row"><div><p class="mini-label">${t("average")}</p><p class="meta"><strong>${rolling.avgFeed}</strong> ml</p></div><div class="stacked-stats"><div class="stacked-row">${iconHtml("pee")}<span class="visually-hidden">${t("pee")}</span><strong>${rolling.peeCount} ${t("times")}</strong></div><div class="stacked-row">${iconHtml("poo")}<span class="visually-hidden">${t("poo")}</span><strong>${rolling.pooCount} ${t("times")}</strong></div></div></div>
       </div>
       <div class="overview-card rhythm"><h2 class="panel-heading">${t("timeline26")}</h2>${renderRhythm(rolling.start,state.now)}</div>
     </section>
@@ -877,6 +886,16 @@ function parseDiaper(log) {
 }
 
 function isEditableRecordType(type) { return ["feeding", "diaper", "temperature"].includes(String(type)); }
+
+function latestFeeding() {
+  let latest = null;
+  for (const raw of state.logs) {
+    const log = normalizeLog(raw);
+    if (log.type !== "feeding" || log.date > state.now) continue;
+    if (!latest || log.date > latest.date) latest = log;
+  }
+  return latest;
+}
 
 function parseIntensityFromText(text,key) {
   const match = new RegExp(`${key}\\s*[:= ]\\s*(none|small|medium|large|無|少|中|多|少量|中量|多量)`,"i").exec(text);
