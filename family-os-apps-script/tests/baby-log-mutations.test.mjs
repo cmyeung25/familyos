@@ -77,6 +77,28 @@ test("update_baby_log changes only the located row and appends an update audit",
   assert.equal(audits[0].after.value_number, 90);
 });
 
+test("update_baby_log can change only the feeding medicine flag in remarks", () => {
+  const { context, writes, audits } = setupMutation({
+    ...feedingRecord(),
+    remarks: "Recorded through iPad BB App; prepared_ml=120; actual_ml=120; medicine_given=false",
+  });
+  const result = context.updateBabyLog_({
+    baby_log_id: "baby_test",
+    expected_updated_at: "2026-08-14 12:20:00+08:00",
+    patch: {
+      remarks: "Recorded through iPad BB App; prepared_ml=120; actual_ml=120; medicine_given=true",
+    },
+  }, { request_text: "edit feed medicine" });
+
+  assert.match(result.remarks, /medicine_given=true/);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].changes.remarks, "Recorded through iPad BB App; prepared_ml=120; actual_ml=120; medicine_given=true");
+  assert.equal(writes[0].changes.value_number, undefined);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].before.remarks.includes("medicine_given=false"), true);
+  assert.equal(audits[0].after.remarks.includes("medicine_given=true"), true);
+});
+
 test("update_baby_log rejects a stale version before writing", () => {
   const { context, writes, audits } = setupMutation();
   assert.throws(() => context.updateBabyLog_({

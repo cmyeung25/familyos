@@ -135,10 +135,12 @@ async function serveStatic(req, res) {
 
   const contentType = mimeTypes.get(extname(filePath)) || "application/octet-stream";
   const isShell = filePath.endsWith("index.html");
+  const staticRel = relative(publicDir, filePath).replace(/\\/g, "/");
+  const isRevalidatedShellAsset = isShell || staticRel === "service-worker.js" || ["app.js", "styles.css", "manifest.webmanifest"].includes(staticRel);
   res.writeHead(200, {
     ...securityHeaders(),
     "Content-Type": contentType,
-    "Cache-Control": isShell ? "no-store" : "public, max-age=3600",
+    "Cache-Control": isRevalidatedShellAsset ? "no-cache" : "public, max-age=3600",
   });
   createReadStream(filePath).pipe(res);
 }
