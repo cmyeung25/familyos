@@ -119,7 +119,8 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: first static PWA shell, local active-bottle timer, recent timeline, Today and rolling 26-hour summaries
 - `Completed`: thin Node proxy that keeps `FAMILY_OS_API_KEY` server-side and uses existing Apps Script API actions
 - `Completed`: fixed-height bilingual iPad dashboard with flat non-distorted icons, temperature / feeding-completion popups, live-following event times, and per-feed diagonal-capsule medicine metadata stored in feeding remarks
-- `In progress`: Synology container and deploy script are implemented; trusted HTTPS reverse proxy and physical iPad home-screen validation remain
+- `Completed`: Synology container is live on NAS port `8790`, with `https://hbsz.myds.me/` reverse-proxied through a trusted auto-renewing Synology DDNS certificate
+- `Pending`: physical iPad Add to Home Screen validation and one agreed end-to-end write / `audit_log` check
 - `Deferred`: shared cross-device active bottle state until a schema/API extension is explicitly approved
 
 ### Lane D: Knowledge And Skills

@@ -49,6 +49,14 @@ Direct LAN smoke-test URL:
 http://192.168.1.19:8790/
 ```
 
+Current trusted production URL:
+
+```text
+https://hbsz.myds.me/
+```
+
+The production endpoint was verified on 2026-08-14: the PWA, manifest, service worker, container health check, and read-only Apps Script health action all responded successfully. The API reported household `hh_home` and schema `family_os_poc_v1`.
+
 ## Synology Reverse Proxy
 
 In DSM, open `Control Panel -> Login Portal -> Advanced -> Reverse Proxy` and create a rule:
@@ -56,13 +64,13 @@ In DSM, open `Control Panel -> Login Portal -> Advanced -> Reverse Proxy` and cr
 | Field | Value |
 | --- | --- |
 | Source protocol | `HTTPS` |
-| Source hostname | a hostname covered by a trusted certificate |
-| Source port | `443` or another dedicated HTTPS port |
+| Source hostname | `hbsz.myds.me` |
+| Source port | `443` |
 | Destination protocol | `HTTP` |
 | Destination hostname | `127.0.0.1` |
 | Destination port | `8790` |
 
-Assign the matching certificate to this reverse-proxy hostname in `Control Panel -> Security -> Certificate -> Settings`.
+The current default certificate is the auto-renewing Synology DDNS certificate for `hbsz.myds.me`. HSTS is enabled on the reverse-proxy rule.
 
 For home-only use, the hostname should resolve to `192.168.1.19` on the home network. A raw IP URL is useful for the first smoke test, but a trusted HTTPS hostname is required for reliable service-worker caching and Home Screen PWA behavior. Do not accept a permanent certificate warning on the iPad.
 
