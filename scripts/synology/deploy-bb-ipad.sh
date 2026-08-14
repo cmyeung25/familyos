@@ -49,4 +49,4 @@ run_docker compose -f "$COMPOSE_FILE" exec -T familyos-bb-ipad \
 run_docker compose -f "$COMPOSE_FILE" exec -T familyos-bb-ipad \
   node -e "fetch('http://127.0.0.1:8790/api/health').then(r=>r.json()).then(x=>{if(!x.ok)process.exit(1);console.log(JSON.stringify({ok:x.ok,household_id:x.result&&x.result.household_id,schema_version:x.result&&x.result.schema_version}))})"
 
-echo "BB iPad service is available on the NAS LAN at http://192.168.1.19:8790/."
+echo "BB iPad service is available internally at http://127.0.0.1:8791/."

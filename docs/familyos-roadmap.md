@@ -119,7 +119,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: first static PWA shell, local active-bottle timer, recent timeline, Today and rolling 26-hour summaries
 - `Completed`: thin Node proxy that keeps `FAMILY_OS_API_KEY` server-side and uses existing Apps Script API actions
 - `Completed`: fixed-height bilingual iPad dashboard with flat non-distorted icons, temperature / feeding-completion popups, live-following event times, and per-feed diagonal-capsule medicine metadata stored in feeding remarks
-- `Completed`: Synology container is live on NAS port `8790`, with `https://hbsz.myds.me/` reverse-proxied through a trusted auto-renewing Synology DDNS certificate
+- `Completed`: Synology container is bound to NAS loopback port `8791`; the router forwards public port `8790` to the Synology HTTPS reverse proxy on `8792`, serving `https://hbsz.myds.me:8790/` with the trusted auto-renewing Synology DDNS certificate; the hostname's default HTTPS port is not assigned to the BB app
 - `Pending`: physical iPad Add to Home Screen validation and one agreed end-to-end write / `audit_log` check
 - `Deferred`: shared cross-device active bottle state until a schema/API extension is explicitly approved
 

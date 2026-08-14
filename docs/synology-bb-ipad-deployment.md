@@ -4,8 +4,10 @@
 
 ```text
 iPad Safari / Home Screen
-  -> trusted HTTPS hostname on Synology Reverse Proxy
-  -> http://127.0.0.1:8790
+  -> https://hbsz.myds.me:8790
+  -> router TCP 8790 to NAS TCP 8792
+  -> trusted HTTPS hostname on Synology Reverse Proxy port 8792
+  -> http://127.0.0.1:8791
   -> familyos-bb-ipad container
   -> Apps Script API
   -> Google Sheets
@@ -18,7 +20,7 @@ The browser never receives `FAMILY_OS_API_KEY`. The container exposes only the B
 - repo: `/volume1/docker/familyos/repo`
 - compose: `docker-compose.bb-ipad.yml`
 - dedicated secret env: `instances/gary/secrets/bb-ipad.env`
-- LAN port: `8790`
+- Internal loopback port: `8791`
 
 The dedicated env file contains only:
 
@@ -43,16 +45,16 @@ On first run, the script creates `bb-ipad.env` from the two configured API value
 - `GET /healthz` for container liveness
 - `GET /api/health` for Apps Script connectivity
 
-Direct LAN smoke-test URL:
+NAS-local smoke-test URL:
 
 ```text
-http://192.168.1.19:8790/
+http://127.0.0.1:8791/
 ```
 
 Current trusted production URL:
 
 ```text
-https://hbsz.myds.me/
+https://hbsz.myds.me:8790/
 ```
 
 The production endpoint was verified on 2026-08-14: the PWA, manifest, service worker, container health check, and read-only Apps Script health action all responded successfully. The API reported household `hh_home` and schema `family_os_poc_v1`.
@@ -65,14 +67,24 @@ In DSM, open `Control Panel -> Login Portal -> Advanced -> Reverse Proxy` and cr
 | --- | --- |
 | Source protocol | `HTTPS` |
 | Source hostname | `hbsz.myds.me` |
-| Source port | `443` |
+| Source port | `8792` |
 | Destination protocol | `HTTP` |
 | Destination hostname | `127.0.0.1` |
-| Destination port | `8790` |
+| Destination port | `8791` |
 
-The current default certificate is the auto-renewing Synology DDNS certificate for `hbsz.myds.me`. HSTS is enabled on the reverse-proxy rule.
+The current certificate is the auto-renewing Synology DDNS certificate for `hbsz.myds.me`. HSTS is enabled on the reverse-proxy rule. The default HTTPS endpoint `https://hbsz.myds.me/` is intentionally not assigned to this app.
 
-For home-only use, the hostname should resolve to `192.168.1.19` on the home network. A raw IP URL is useful for the first smoke test, but a trusted HTTPS hostname is required for reliable service-worker caching and Home Screen PWA behavior. Do not accept a permanent certificate warning on the iPad.
+In `Control Panel -> External Access -> Router Configuration`, keep the custom TCP forwarding rule:
+
+| Router field | Value |
+| --- | --- |
+| Local port | `8792` |
+| Router port | `8790` |
+| Protocol | `TCP` |
+
+This extra hop is intentional: DSM reserves `8790` in its application port registry, so the reverse proxy listens on `8792` while users continue to open public port `8790`.
+
+The router forwarding rule supports the DDNS hostname from the home network through NAT loopback. Keep using the trusted hostname rather than a raw IP URL so service-worker caching and Home Screen PWA behavior remain on a valid HTTPS origin. Do not accept a permanent certificate warning on the iPad.
 
 ## iPad Setup
 
