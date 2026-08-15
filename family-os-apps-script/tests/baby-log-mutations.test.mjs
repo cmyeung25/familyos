@@ -53,6 +53,15 @@ function setupMutation(record = feedingRecord()) {
   return { context, writes, audits };
 }
 
+function babyLogAt(id, eventAt, type = "feeding") {
+  return {
+    ...feedingRecord(),
+    baby_log_id: id,
+    event_at: eventAt,
+    log_type: type,
+  };
+}
+
 test("update_baby_log changes only the located row and appends an update audit", () => {
   const { context, writes, audits } = setupMutation();
   const result = context.updateBabyLog_({
@@ -142,4 +151,52 @@ test("diaper edits reject an empty pee and poo combination", () => {
     patch: { value_text: JSON.stringify({ pee: "none", poo: "none" }) },
   }, {}), /Select at least one diaper amount/);
   assert.equal(writes.length, 0);
+});
+
+test("query_baby_logs applies an explicit date range and returns page metadata", () => {
+  const context = loadCode();
+  context.rowsAsObjects_ = () => [
+    babyLogAt("old", "2026-08-01 12:00:00+08:00"),
+    babyLogAt("in_1", "2026-08-10 12:00:00+08:00"),
+    babyLogAt("in_2", "2026-08-12 12:00:00+08:00", "diaper"),
+  ];
+
+  const result = context.queryBabyLogs_({
+    from: "2026-08-08 00:00:00+08:00",
+    to: "2026-08-15 23:59:59+08:00",
+    limit: 10,
+  });
+
+  assert.deepEqual(result.items.map((row) => row.baby_log_id), ["in_2", "in_1"]);
+  assert.equal(result.range.days, 8);
+  assert.equal(result.page.count, 2);
+  assert.equal(result.page.has_more, false);
+  assert.equal(result.page.next_cursor, "");
+});
+
+test("query_baby_logs uses a stable cursor without duplicates", () => {
+  const context = loadCode();
+  context.rowsAsObjects_ = () => [
+    babyLogAt("a", "2026-08-15 12:00:00+08:00"),
+    babyLogAt("b", "2026-08-15 11:00:00+08:00"),
+    babyLogAt("c", "2026-08-15 10:00:00+08:00"),
+  ];
+  const range = { from: "2026-08-14 00:00:00+08:00", to: "2026-08-16 00:00:00+08:00", limit: 2 };
+  const first = context.queryBabyLogs_(range);
+  const second = context.queryBabyLogs_({ ...range, cursor: first.page.next_cursor });
+
+  assert.deepEqual(first.items.map((row) => row.baby_log_id), ["a", "b"]);
+  assert.equal(first.page.has_more, true);
+  assert.deepEqual(second.items.map((row) => row.baby_log_id), ["c"]);
+  assert.equal(second.page.has_more, false);
+});
+
+test("query_baby_logs rejects ranges longer than 30 days", () => {
+  const context = loadCode();
+  context.rowsAsObjects_ = () => [];
+  assert.throws(() => context.queryBabyLogs_({
+    from: "2026-07-01 00:00:00+08:00",
+    to: "2026-08-15 00:00:00+08:00",
+  }), /cannot exceed 30 days/);
+  assert.throws(() => context.queryBabyLogs_({ days: 31 }), /1 to 30/);
 });

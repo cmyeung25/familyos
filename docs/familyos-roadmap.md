@@ -119,6 +119,8 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: first static PWA shell, local active-bottle timer, recent timeline, Today and rolling 26-hour summaries
 - `Completed`: thin Node proxy that keeps `FAMILY_OS_API_KEY` server-side and uses existing Apps Script API actions
 - `Completed`: fixed-height bilingual iPad dashboard with flat non-distorted icons, temperature / feeding-completion popups, live-following event times, and per-feed diagonal-capsule medicine metadata stored in feeding remarks
+- `Completed`: fixed-height bilingual BB insights dashboard with Today / 7-day / 30-day / custom ranges, personal baseline comparisons, 24-hour swimlanes, and milk / diaper / temperature trends
+- `Completed`: additive `query_baby_logs` Apps Script action with default 7-day and maximum 30-day ranges plus stable cursor pagination; the legacy recent-log action remains compatible
 - `Completed`: Synology container is bound to NAS loopback port `8791`; the router forwards public port `8790` to the Synology HTTPS reverse proxy on `8792`, serving `https://hbsz.myds.me:8790/` with the trusted auto-renewing Synology DDNS certificate; the hostname's default HTTPS port is not assigned to the BB app
 - `Pending`: physical iPad Add to Home Screen validation and one agreed end-to-end write / `audit_log` check
 - `Deferred`: shared cross-device active bottle state until a schema/API extension is explicitly approved
@@ -218,7 +220,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - Goal:
   - provide a fixed home iPad surface for fast BB daily logging without keyboard input
 - Current implementation note:
-  - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the Apps Script API actions `health`, `get_recent_baby_logs`, `append_baby_log`, `update_baby_log`, and `delete_baby_log`
+  - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the Apps Script API actions `health`, `get_recent_baby_logs`, `query_baby_logs`, `append_baby_log`, `update_baby_log`, and `delete_baby_log`
   - recent feeding, diaper, and temperature records support optimistic-concurrency updates and audited soft deletion from a fixed-height popup
   - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
 

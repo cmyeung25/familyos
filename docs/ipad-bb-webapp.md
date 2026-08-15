@@ -33,6 +33,7 @@ The current interaction design includes:
 - double-tap zoom prevention on touch controls while keeping normal pinch-to-zoom accessibility available
 - blocking submit-in-progress cards and explicit success confirmation cards for audited writes
 - compact success toast feedback for local actions such as starting the bottle timer
+- a fixed-height `Insights & trends` dashboard with Today / 7-day / 30-day / custom date ranges, four baseline KPI cards, a 24-hour swimlane, daily milk and diaper trends, temperature trend, feed distribution, and compact raw-record access
 
 ## Architecture
 
@@ -53,11 +54,20 @@ The PWA uses the existing Apps Script actions:
 
 - `health`
 - `get_recent_baby_logs`
+- `query_baby_logs`
 - `append_baby_log`
 - `update_baby_log`
 - `delete_baby_log`
 
 It does not add schema columns.
+
+`query_baby_logs` is additive and leaves the legacy recent-log array contract unchanged. It accepts either `days` (default `7`) or an explicit `from` / `to` range, rejects ranges over 30 days, and returns:
+
+- `items`: compact `baby_log` records ordered newest first
+- `range`: the resolved `from`, `to`, and day count
+- `page`: `limit`, `count`, `has_more`, and a stable `next_cursor`
+
+The PWA follows `next_cursor` until the selected range is complete. This avoids the previous first-100-record ceiling for 7-day and 30-day statistics.
 
 ### Diaper
 

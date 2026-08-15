@@ -40,6 +40,11 @@ const I18N = {
     recordUpdating: "正在更新記錄", recordUpdated: "記錄已更新", recordDeleting: "正在刪除記錄", recordDeleted: "記錄已刪除", unsupportedEdit: "這類記錄暫不支援修改",
     recordChanged: "記錄已在另一部裝置更改，請刷新後再試。", actualAmount: "實際飲奶量", changePreparedAmount: "沖奶量", previousDay: "前一日", nextDay: "後一日",
     times: "次", hour10: "10時", hour14: "14時", hour16: "16時", hour18: "18時", hour22: "22時", hour02: "02時", hour04: "04時", hour06: "06時",
+    statsTitle: "統計與趨勢", statsSubtitle: "掌握小桃B最近生活節奏與變化", statsToday: "今日", stats7: "7日", stats30: "30日", statsCustom: "自訂", statsLoading: "正在載入統計資料…", statsAverage: "平均", recentAverage: "近期日均",
+    perDay: "/ 日", comparedWithAverage: "今日較日均 {delta}", closeToAverage: "與近期日均接近", aboveAverage: "較近期日均多 {value}", belowAverage: "較近期日均少 {value}", noComparison: "未有足夠資料比較",
+    lifeTimeline: "24 小時生活時間軸", summaryToday: "今日摘要", versusAverage: "今日 vs {days}日平均", milkTrend: "每日奶量趨勢", diaperTrend: "尿片與大便次數", temperatureTrend: "體溫趨勢", feedDistribution: "每餐奶量分佈", rawRecent: "最近記錄",
+    urineShort: "尿片", stoolShort: "大便", latestTemp: "最新體溫", avgDaily: "日均", totalFeeds: "總餵奶次數", averageInterval: "平均間隔", dateRange: "日期範圍", startDate: "開始日期", endDate: "結束日期", applyRange: "套用日期", invalidRange: "日期範圍必須為 1 至 30 日",
+    milkNearInsight: "奶量與小桃B近期日均接近", milkHighInsight: "今日奶量較近期日均多", milkLowInsight: "今日奶量較近期日均少", pooHighInsight: "今日大便次數較近期多", pooNearInsight: "大便次數與近期日均接近", tempInsight: "最新體溫為 {value}", noDataInsight: "這個範圍未有足夠記錄",
   },
   en: {
     age: "6 weeks 3 days (45 days)", home: "Home", stats: "Insights", settings: "Settings",
@@ -67,6 +72,11 @@ const I18N = {
     recordUpdating: "Updating record", recordUpdated: "Record updated", recordDeleting: "Deleting record", recordDeleted: "Record deleted", unsupportedEdit: "This record type cannot be edited yet",
     recordChanged: "This record changed on another device. Refresh and try again.", actualAmount: "Actual milk", changePreparedAmount: "Prepared milk", previousDay: "Previous day", nextDay: "Next day",
     times: "times", hour10: "10h", hour14: "14h", hour16: "16h", hour18: "18h", hour22: "22h", hour02: "02h", hour04: "04h", hour06: "06h",
+    statsTitle: "Insights & trends", statsSubtitle: "See Siu To B's recent rhythm and changes", statsToday: "Today", stats7: "7 days", stats30: "30 days", statsCustom: "Custom", statsLoading: "Loading insight data…", statsAverage: "Average", recentAverage: "Recent daily avg",
+    perDay: "/ day", comparedWithAverage: "Today vs daily avg {delta}", closeToAverage: "Close to recent daily avg", aboveAverage: "{value} above recent avg", belowAverage: "{value} below recent avg", noComparison: "Not enough data to compare",
+    lifeTimeline: "24-hour life timeline", summaryToday: "Today summary", versusAverage: "Today vs {days}-day avg", milkTrend: "Daily milk trend", diaperTrend: "Urine and stool counts", temperatureTrend: "Temperature trend", feedDistribution: "Feed amount distribution", rawRecent: "Recent logs",
+    urineShort: "Urine", stoolShort: "Stool", latestTemp: "Latest temperature", avgDaily: "Daily avg", totalFeeds: "Total feeds", averageInterval: "Average interval", dateRange: "Date range", startDate: "Start date", endDate: "End date", applyRange: "Apply range", invalidRange: "Date range must be between 1 and 30 days",
+    milkNearInsight: "Milk is close to Siu To B's recent daily average", milkHighInsight: "Today's milk is above the recent daily average", milkLowInsight: "Today's milk is below the recent daily average", pooHighInsight: "Today's stool count is above the recent average", pooNearInsight: "Stool count is close to the recent daily average", tempInsight: "Latest temperature is {value}", noDataInsight: "Not enough logs in this range",
   },
 };
 
@@ -75,6 +85,15 @@ const state = {
   activeTab: "panel",
   lang: localStorage.getItem(STORAGE_KEYS.language) === "en" ? "en" : "zh",
   timelineFilter: "all",
+  statsRangeMode: "7",
+  statsLogs: [],
+  statsFrom: "",
+  statsTo: "",
+  statsLoading: false,
+  statsLoadedKey: "",
+  statsCustomOpen: false,
+  statsCustomFrom: "",
+  statsCustomTo: "",
   apiStatus: { ok: null, text: "", textKey: "checking" },
   logs: readJson(STORAGE_KEYS.logs, []),
   saving: "",
@@ -123,6 +142,7 @@ document.addEventListener("touchend", (event) => {
 }, { passive: false });
 
 document.addEventListener("click", handleClick);
+document.addEventListener("change", handleChange);
 window.addEventListener("online", () => refreshData("online"));
 window.addEventListener("focus", () => {
   lockRecentRecordActions();
@@ -177,6 +197,10 @@ function handleClick(event) {
   if (action === "save-temperature") saveTemperature();
   if (action === "dismiss-submit") dismissSubmit();
   if (action === "timeline-filter") setTimelineFilter(button.dataset.filter);
+  if (action === "stats-range") setStatsRange(button.dataset.range);
+  if (action === "open-custom-range") openStatsCustomRange();
+  if (action === "close-custom-range") closeStatsCustomRange();
+  if (action === "apply-custom-range") applyStatsCustomRange();
   if (action === "open-record" && !recentRecordActionsLocked()) openRecordEditor(button.dataset.id);
   if (action === "close-record") closeRecordEditor();
   if (action === "edit-time-step") adjustRecordTime(Number(button.dataset.minutes));
@@ -190,6 +214,11 @@ function handleClick(event) {
   if (action === "ask-delete-record") setRecordDeleteConfirm(true);
   if (action === "cancel-delete-record") setRecordDeleteConfirm(false);
   if (action === "confirm-delete-record") deleteRecord();
+}
+
+function handleChange(event) {
+  if (event.target.matches('[data-stats-date="from"]')) state.statsCustomFrom = event.target.value;
+  if (event.target.matches('[data-stats-date="to"]')) state.statsCustomTo = event.target.value;
 }
 
 function render() {
@@ -218,7 +247,7 @@ function render() {
   let page = renderPanel();
   if (state.activeTab === "timeline") page = renderTimelinePage();
   if (state.activeTab === "settings") page = renderSettingsPage();
-  app.innerHTML = `${page}${renderTemperatureModal()}${renderFeedingModal()}${renderRecordEditorModal()}${renderSubmitOverlay()}`;
+  app.innerHTML = `${page}${renderStatsCustomModal()}${renderTemperatureModal()}${renderFeedingModal()}${renderRecordEditorModal()}${renderSubmitOverlay()}`;
 }
 
 function renderNotice() {
@@ -552,10 +581,190 @@ function renderSubmitOverlay() {
   return `<div class="submit-backdrop"><section class="submit-card success" role="dialog" aria-modal="true" aria-live="polite"><h2>${escapeHtml(flow.successTitle)}</h2><div class="submit-symbol">${iconHtml("check")}</div><p class="submit-detail">${escapeHtml(flow.detail)}</p><button class="outline-button" data-action="dismiss-submit">${label}</button></section></div>`;
 }
 
+function renderStatsCustomModal() {
+  if (!state.statsCustomOpen) return "";
+  return `<div class="modal-backdrop"><section class="modal-card stats-date-modal" role="dialog" aria-modal="true" aria-labelledby="stats-date-title"><div class="modal-header"><h2 class="modal-title" id="stats-date-title">${iconHtml("calendar",true)}${t("dateRange")}</h2><button class="close-button" type="button" data-action="close-custom-range" aria-label="${t("close")}">×</button></div><div class="stats-date-fields"><label><span>${t("startDate")}</span><input type="date" data-stats-date="from" value="${escapeHtml(state.statsCustomFrom)}"></label><label><span>${t("endDate")}</span><input type="date" data-stats-date="to" value="${escapeHtml(state.statsCustomTo)}"></label></div><button class="primary-button" type="button" data-action="apply-custom-range">${t("applyRange")}</button></section></div>`;
+}
+
 function renderTimelinePage() {
-  const filtered = state.logs.map(normalizeLog).filter(log => state.timelineFilter === "all" || log.type === state.timelineFilter).slice(0,10);
-  const filters = [["all",t("all")],["feeding",t("feeding")],["diaper",t("diaper")],["temperature",t("temperature")]];
-  return `<div class="timeline-page"><section class="card card-pad"><div class="timeline-toolbar"><div><h2>${t("stats")}</h2><p class="meta">${t("showing", {count: filtered.length})}</p></div><div class="filter-row">${filters.map(([value,label]) => `<button class="filter-button ${state.timelineFilter === value ? "is-selected" : ""}" data-action="timeline-filter" data-filter="${value}">${label}</button>`).join("")}<button class="filter-button" data-action="refresh">${t("refresh")}</button></div></div><div class="recent-list">${filtered.map(renderRecentItem).join("")}</div></section></div>`;
+  const rangeButtons = [["today",t("statsToday")],["7",t("stats7")],["30",t("stats30")]];
+  if (state.statsLoading && !state.statsLogs.length) {
+    return `<div class="timeline-page"><section class="stats-dashboard"><div class="stats-toolbar"><div><h2>${t("statsTitle")}</h2><p>${t("statsSubtitle")}</p></div>${renderStatsRangeControls(rangeButtons)}</div><div class="stats-loading">${t("statsLoading")}</div></section></div>`;
+  }
+
+  const logs = state.statsLogs.map(normalizeLog).filter((log) => log.date <= state.now);
+  const series = buildStatsDailySeries(logs);
+  const todayKey = hongKongDateKey(state.now);
+  const todayRow = series.find((row) => row.key === todayKey) || emptyStatsDay(todayKey);
+  const baselineRows = series.filter((row) => row.key !== todayKey);
+  const baseline = averageStatsDays(baselineRows.length ? baselineRows : series);
+  const rangeSummary = averageStatsDays(series);
+  const displayAverage = baselineRows.length ? baseline : rangeSummary;
+  const temperatures = logs.filter((log) => log.type === "temperature");
+  const latestTemperature = temperatures.sort((left,right) => right.date-left.date)[0];
+  const averageTemperature = temperatures.length ? temperatures.reduce((sum,log) => sum + Number(log.raw.value_number || 0),0) / temperatures.length : 0;
+  const recentLogs = logs.slice().sort((left,right) => right.date-left.date).slice(0,3);
+  const comparisonDays = Math.max(1, baselineRows.length || series.length);
+
+  return `<div class="timeline-page"><section class="stats-dashboard ${state.statsLoading ? "is-loading" : ""}">
+    <div class="stats-toolbar">
+      <div><h2>${t("statsTitle")}</h2><p>${t("statsSubtitle")}</p></div>
+      ${renderStatsRangeControls(rangeButtons)}
+    </div>
+    <div class="stats-kpi-grid">
+      ${renderStatsKpi("bottle",t("feeding"),`${Math.round(displayAverage.milk)}<small> ml ${t("perDay")}</small>`,comparisonText(todayRow.milk,baseline.milk,"ml"),comparisonTone(todayRow.milk,baseline.milk))}
+      ${renderStatsKpi("pee",t("urineShort"),`${formatOne(displayAverage.pee)}<small> ${t("times")} ${t("perDay")}</small>`,comparisonText(todayRow.pee,baseline.pee,t("times")),comparisonTone(todayRow.pee,baseline.pee))}
+      ${renderStatsKpi("poo",t("stoolShort"),`${formatOne(displayAverage.poo)}<small> ${t("times")} ${t("perDay")}</small>`,comparisonText(todayRow.poo,baseline.poo,t("times")),comparisonTone(todayRow.poo,baseline.poo))}
+      ${renderStatsKpi("temp",t("temperature"),averageTemperature ? `${averageTemperature.toFixed(1)}<small>°C ${t("statsAverage")}</small>` : "--",latestTemperature ? `${t("latest")} ${Number(latestTemperature.raw.value_number || 0).toFixed(1)}°C` : t("noComparison"),"neutral")}
+    </div>
+    <div class="stats-row stats-rhythm-row">
+      <article class="stats-card stats-life-card"><h3>${t("lifeTimeline")}</h3>${renderLifeSwimlane(logs)}</article>
+      <article class="stats-card stats-summary-card"><h3>${t("summaryToday")}</h3><div class="stats-summary-body">${renderStatsInsights(todayRow,baseline,latestTemperature)}${renderTodayComparison(todayRow,baseline,comparisonDays)}</div></article>
+    </div>
+    <div class="stats-row stats-chart-row">
+      <article class="stats-card"><h3>${t("milkTrend")}</h3>${renderMilkTrend(series,logs)}</article>
+      <article class="stats-card"><h3>${t("diaperTrend")}</h3>${renderDiaperTrend(series)}</article>
+    </div>
+    <div class="stats-row stats-detail-row">
+      <article class="stats-card"><h3>${t("feedDistribution")}</h3>${renderFeedDistribution(logs)}</article>
+      <article class="stats-card"><h3>${t("temperatureTrend")}</h3>${renderTemperatureTrend(series)}</article>
+    </div>
+    <article class="stats-card stats-recent-strip"><div class="stats-recent-header"><h3>${t("rawRecent")}</h3><span>${statsRangeLabel()}</span></div><div class="stats-recent-grid">${recentLogs.length ? recentLogs.map(renderStatsRecentItem).join("") : `<p class="stats-empty">${t("noRecent")}</p>`}</div></article>
+  </section></div>`;
+}
+
+function renderStatsRangeControls(buttons) {
+  const disabled = state.statsLoading ? "disabled" : "";
+  return `<div class="stats-range-control" aria-label="${t("dateRange")}">${buttons.map(([value,label]) => `<button type="button" data-action="stats-range" data-range="${value}" class="${state.statsRangeMode === value ? "is-selected" : ""}" ${disabled}>${label}</button>`).join("")}<button type="button" data-action="open-custom-range" class="${state.statsRangeMode === "custom" ? "is-selected" : ""}" ${disabled}>${t("statsCustom")}</button></div>`;
+}
+
+function renderStatsKpi(icon,label,value,comparison,tone) {
+  return `<article class="stats-kpi">${iconHtml(icon)}<div><span class="stats-kpi-label">${label}</span><strong>${value}</strong><p class="${tone}">${comparison}</p></div></article>`;
+}
+
+function buildStatsDailySeries(logs) {
+  const from = parseTimestamp(state.statsFrom) || new Date(state.now.getTime()-6*86400000);
+  const to = parseTimestamp(state.statsTo) || state.now;
+  const first = startOfHongKongDay(from);
+  const last = startOfHongKongDay(to);
+  const rows = [];
+  for (let cursor = first.getTime(), count = 0; cursor <= last.getTime() && count < 30; cursor += 86400000, count += 1) {
+    const date = new Date(cursor);
+    rows.push(emptyStatsDay(hongKongDateKey(date),date));
+  }
+  const byKey = new Map(rows.map((row) => [row.key,row]));
+  for (const log of logs) {
+    const row = byKey.get(hongKongDateKey(log.date));
+    if (!row) continue;
+    if (log.type === "feeding") { row.milk += Number(log.raw.value_number || 0); row.feeds += 1; }
+    if (log.type === "diaper") { if (log.diaper.pee !== "none") row.pee += 1; if (log.diaper.poo !== "none") row.poo += 1; }
+    if (log.type === "temperature") row.temperatures.push(Number(log.raw.value_number || 0));
+  }
+  return rows;
+}
+
+function emptyStatsDay(key,date=parseTimestamp(`${key} 00:00:00+08:00`) || new Date()) { return {key,date,milk:0,feeds:0,pee:0,poo:0,temperatures:[]}; }
+
+function averageStatsDays(rows) {
+  const count = Math.max(1,rows.length);
+  return rows.reduce((result,row) => ({milk:result.milk+row.milk/count,feeds:result.feeds+row.feeds/count,pee:result.pee+row.pee/count,poo:result.poo+row.poo/count}),{milk:0,feeds:0,pee:0,poo:0});
+}
+
+function comparisonText(today,average,unit) {
+  if (!average) return t("noComparison");
+  const difference = today-average;
+  const threshold = Math.max(average*.1,unit === "ml" ? 20 : .5);
+  if (Math.abs(difference) <= threshold) return t("closeToAverage");
+  const value = unit === "ml" ? `${Math.round(Math.abs(difference))} ml` : `${formatOne(Math.abs(difference))} ${unit}`;
+  return difference > 0 ? t("aboveAverage",{value}) : t("belowAverage",{value});
+}
+
+function comparisonTone(today,average) {
+  if (!average || Math.abs(today-average) <= Math.max(average*.1,.5)) return "neutral";
+  return today > average ? "up" : "down";
+}
+
+function renderLifeSwimlane(logs) {
+  const end = state.now;
+  const start = new Date(end.getTime()-24*3600000);
+  const recent = logs.filter((log) => log.date >= start && log.date <= end);
+  const labels = Array.from({length:7},(_,index) => formatClock(new Date(start.getTime()+index*4*3600000)));
+  const lanes = [
+    ["bottle",t("feeding"),recent.filter((log) => log.type === "feeding")],
+    ["pee",t("urineShort"),recent.filter((log) => log.type === "diaper" && log.diaper.pee !== "none")],
+    ["poo",t("stoolShort"),recent.filter((log) => log.type === "diaper" && log.diaper.poo !== "none")],
+    ["temp",t("temperature"),recent.filter((log) => log.type === "temperature")],
+  ];
+  return `<div class="swimlane-labels">${labels.map((label) => `<span>${label}</span>`).join("")}</div><div class="swimlanes">${lanes.map(([icon,label,laneLogs]) => `<div class="swimlane"><div class="swimlane-name">${iconHtml(icon)}<span>${label}</span></div><div class="swimlane-track">${renderGroupedTimelineMarkers(laneLogs,start,end,icon)}</div></div>`).join("")}</div>`;
+}
+
+function renderGroupedTimelineMarkers(logs,start,end,icon) {
+  const groups = new Map();
+  const span = end-start;
+  logs.forEach((log) => {
+    const percentage = clamp(((log.date-start)/span)*100,1,99);
+    const bin = Math.round(percentage/4);
+    const group = groups.get(bin) || {percentage,total:0};
+    group.total += 1;
+    group.percentage = (group.percentage*(group.total-1)+percentage)/group.total;
+    groups.set(bin,group);
+  });
+  return [...groups.values()].map((group) => `<span class="swimlane-marker" style="left:${group.percentage}%">${iconHtml(icon)}${group.total > 1 ? `<b>${group.total}</b>` : ""}</span>`).join("");
+}
+
+function renderStatsInsights(today,baseline,latestTemperature) {
+  if (!today.milk && !today.pee && !today.poo && !latestTemperature) return `<div class="insight-list"><p>${t("noDataInsight")}</p></div>`;
+  const milkRatio = baseline.milk ? today.milk/baseline.milk : 1;
+  const milkKey = milkRatio > 1.12 ? "milkHighInsight" : milkRatio < .88 ? "milkLowInsight" : "milkNearInsight";
+  const pooKey = baseline.poo && today.poo > baseline.poo*1.3+.5 ? "pooHighInsight" : "pooNearInsight";
+  return `<div class="insight-list"><p>${iconHtml("bottle")}${t(milkKey)}</p><p>${iconHtml("poo")}${t(pooKey)}</p>${latestTemperature ? `<p>${iconHtml("temp")}${t("tempInsight",{value:`${Number(latestTemperature.raw.value_number || 0).toFixed(1)}°C`})}</p>` : ""}</div>`;
+}
+
+function renderTodayComparison(today,baseline,days) {
+  const rows = [["bottle",t("feeding"),`${today.milk} ml`,`${Math.round(baseline.milk)} ml`],["pee",t("urineShort"),`${today.pee}`,formatOne(baseline.pee)],["poo",t("stoolShort"),`${today.poo}`,formatOne(baseline.poo)]];
+  return `<div class="comparison-table"><div class="comparison-head"><span></span><b>${t("statsToday")}</b><b>${t("recentAverage")}</b></div>${rows.map(([icon,label,current,average]) => `<div class="comparison-row"><span>${iconHtml(icon)}${label}</span><b>${current}</b><b>${average}</b></div>`).join("")}</div>`;
+}
+
+function renderMilkTrend(series,logs) {
+  const max = Math.max(1,...series.map((row) => row.milk));
+  const average = series.length ? series.reduce((sum,row) => sum+row.milk,0)/series.length : 0;
+  const feedLogs = logs.filter((log) => log.type === "feeding").sort((left,right) => left.date-right.date);
+  const intervals = feedLogs.slice(1).map((log,index) => log.date-feedLogs[index].date).filter((value) => value > 0 && value < 12*3600000);
+  const averageInterval = intervals.length ? intervals.reduce((sum,value) => sum+value,0)/intervals.length : 0;
+  const feeds = series.reduce((sum,row) => sum+row.feeds,0);
+  return `${renderDailyBars(series,(row) => row.milk,max,"milk")}<div class="chart-foot-stats"><span>${iconHtml("bottle")}<b>${feeds}</b> ${t("totalFeeds")}</span><span><b>${feeds ? Math.round(series.reduce((sum,row) => sum+row.milk,0)/feeds) : 0} ml</b> ${t("average")}</span><span><b>${averageInterval ? formatCompactDuration(averageInterval) : "--"}</b> ${t("averageInterval")}</span><span class="chart-average">${t("avgDaily")} ${Math.round(average)} ml</span></div>`;
+}
+
+function renderDailyBars(series,valueFor,max,tone) {
+  return `<div class="daily-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const value=valueFor(row); const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="daily-bar-column"><span class="daily-bar-value">${value || ""}</span><span class="daily-bar ${tone}" style="height:${Math.max(value ? 8 : 2,Math.round(value/max*72))}%"></span><span class="daily-bar-label">${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div>`;
+}
+
+function renderDiaperTrend(series) {
+  const max = Math.max(1,...series.flatMap((row) => [row.pee,row.poo]));
+  return `<div class="grouped-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="grouped-column"><div><span class="grouped-bar pee" style="height:${Math.max(row.pee ? 8 : 2,Math.round(row.pee/max*72))}%"><b>${row.pee || ""}</b></span><span class="grouped-bar poo" style="height:${Math.max(row.poo ? 8 : 2,Math.round(row.poo/max*72))}%"><b>${row.poo || ""}</b></span></div><span>${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div><div class="chart-legend"><span>${iconHtml("pee")}${t("urineShort")}</span><span>${iconHtml("poo")}${t("stoolShort")}</span></div>`;
+}
+
+function renderFeedDistribution(logs) {
+  const buckets = [{label:"≤60",min:0,max:75},{label:"90",min:76,max:105},{label:"120",min:106,max:135},{label:"150+",min:136,max:999}];
+  const amounts = logs.filter((log) => log.type === "feeding").map((log) => Number(log.raw.value_number || 0));
+  const total = Math.max(1,amounts.length);
+  return `<div class="distribution-bar">${buckets.map((bucket) => { const count=amounts.filter((value) => value>=bucket.min && value<=bucket.max).length; const pct=Math.round(count/total*100); return `<div style="--share:${Math.max(12,pct)}"><span>${bucket.label} ml</span><b>${pct}%</b></div>`; }).join("")}</div>`;
+}
+
+function renderTemperatureTrend(series) {
+  const points = series.map((row,index) => ({index,value:row.temperatures.length ? row.temperatures.reduce((sum,value) => sum+value,0)/row.temperatures.length : null,date:row.date})).filter((point) => point.value !== null);
+  if (!points.length) return `<p class="stats-empty">${t("noRecent")}</p>`;
+  const values = points.map((point) => point.value);
+  const minimum = Math.min(...values)-.2;
+  const maximum = Math.max(...values)+.2;
+  const span = Math.max(.4,maximum-minimum);
+  const width = 520, height = 66;
+  const coordinates = points.map((point) => ({...point,x:series.length===1 ? width/2 : point.index/(series.length-1)*width,y:height-(point.value-minimum)/span*height}));
+  return `<div class="temperature-chart"><svg viewBox="0 0 ${width} 82" role="img" aria-label="${t("temperatureTrend")}"><polyline points="${coordinates.map((point) => `${point.x},${point.y}`).join(" ")}" fill="none" stroke="currentColor" stroke-width="2"/>${coordinates.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3"/><text x="${point.x}" y="${Math.max(10,point.y-7)}">${point.value.toFixed(1)}</text>`).join("")}</svg><div><b>${Math.max(...values).toFixed(1)}°C</b><span>${Math.min(...values).toFixed(1)}°C</span></div></div>`;
+}
+
+function renderStatsRecentItem(log) {
+  return `<div class="stats-recent-item">${iconHtml(log.icon)}<div><b>${formatClock(log.date)}</b><span>${relativeAge(log.date)}</span></div><div><strong>${log.type === "diaper" ? t("diaperRecord") : log.title}</strong><span>${log.detail}</span></div></div>`;
 }
 
 function renderSettingsPage() {
@@ -568,14 +777,63 @@ async function refreshData(reason) {
   try {
     const health = await getHealth();
     state.apiStatus = { ok:true, text:`${health.household_id || "hh_home"} · ${health.schema_version || "schema ok"}`, textKey:"" };
-    const logs = await callApi("get_recent_baby_logs",{limit:100},"iPad BB App refresh");
-    state.logs = Array.isArray(logs) ? logs : [];
+    const request = statsRequestForDays(7);
+    const logs = await fetchBabyLogPages(request,"iPad BB App 7-day refresh");
+    state.logs = logs;
     localStorage.setItem(STORAGE_KEYS.logs,JSON.stringify(state.logs));
+    if (!state.statsLoadedKey || state.statsRangeMode === "7") {
+      state.statsLogs = logs;
+      state.statsFrom = request.from;
+      state.statsTo = request.to;
+      state.statsLoadedKey = "7";
+    }
     if (reason === "manual") showNotice(t("refreshed"),t("refreshedDetail", {count: state.logs.length}),"success");
   } catch (error) {
     state.apiStatus = {ok:false,text:"API offline",textKey:""};
     if (reason !== "load" || !state.logs.length) showNotice(t("connectionFailed"),error.message || t("apiOffline"),"error");
   } finally { render(); }
+}
+
+async function fetchBabyLogPages(request,requestText) {
+  const logs = [];
+  let cursor = "";
+  try {
+    for (let page = 0; page < 10; page += 1) {
+      const result = await callApi("query_baby_logs",{...request,limit:200,cursor},requestText);
+      logs.push(...(Array.isArray(result?.items) ? result.items : []));
+      if (!result?.page?.has_more || !result.page.next_cursor) break;
+      cursor = result.page.next_cursor;
+    }
+    return logs;
+  } catch (error) {
+    if (Number(request.days || 7) > 7) throw error;
+    const legacy = await callApi("get_recent_baby_logs",{limit:100},`${requestText} legacy fallback`);
+    return Array.isArray(legacy) ? legacy : [];
+  }
+}
+
+function statsRequestForDays(days) {
+  const end = state.now;
+  const start = new Date(startOfHongKongDay(end).getTime()-(days-1)*86400000);
+  return {from:toHongKongTimestamp(start),to:toHongKongTimestamp(end),days};
+}
+
+async function loadStatsData(request,key) {
+  if (state.statsLoading) return;
+  state.statsLoading = true;
+  render();
+  try {
+    const logs = await fetchBabyLogPages(request,`iPad BB App insights ${key}`);
+    state.statsLogs = logs;
+    state.statsFrom = request.from;
+    state.statsTo = request.to;
+    state.statsLoadedKey = key;
+  } catch (error) {
+    showNotice(t("connectionFailed"),error.message || t("apiOffline"),"error");
+  } finally {
+    state.statsLoading = false;
+    render();
+  }
 }
 
 async function getHealth() {
@@ -650,7 +908,7 @@ function saveTemperature() {
 }
 
 function openRecordEditor(id) {
-  const raw = state.logs.find((log) => String(log.baby_log_id || "") === String(id || ""));
+  const raw = [...state.logs,...state.statsLogs].find((log) => String(log.baby_log_id || "") === String(id || ""));
   if (!raw) return;
   const log = normalizeLog(raw);
   if (!isEditableRecordType(log.type)) {
@@ -866,7 +1124,11 @@ function openFinishBottle() {
 }
 function closeFinishBottle() { state.finishOpen = false; render(); }
 function clearActiveBottle(notifyUser) { state.activeBottle = null; state.finishOpen = false; state.actualMl = state.preparedMl; localStorage.removeItem(STORAGE_KEYS.activeBottle); if (notifyUser) showNotice(t("timerCleared"),t("localTimerRemoved"),"success"); render(); }
-function setTab(tab) { state.activeTab = tab; render(); }
+function setTab(tab) {
+  state.activeTab = tab;
+  render();
+  if (tab === "timeline" && !state.statsLoadedKey) loadStatsData(statsRequestForDays(7),"7");
+}
 function adjustTime(scope,minutes) { state.times[scope] = new Date(effectiveTime(scope).getTime()+minutes*60000); state.timeFollowing[scope] = false; render(); }
 function setTimeNow(scope) { resetTimeFollowing(scope); render(); }
 function setIntensity(kind,value) { state.diaper[kind] = value; render(); }
@@ -881,6 +1143,34 @@ function toggleActiveMedicine() {
 function setActualMl(value) { state.actualMl = clamp(Math.round(value/5)*5,0,activeBottlePreparedMl()); render(); }
 function setTemperature(value) { state.temperature = clamp(Math.round(value*10)/10,34,42); render(); }
 function setTimelineFilter(filter) { state.timelineFilter = filter; render(); }
+function setStatsRange(range) {
+  if (!["today","7","30"].includes(range)) return;
+  state.statsRangeMode = range;
+  const days = range === "today" ? 7 : Number(range);
+  loadStatsData(statsRequestForDays(days),range);
+}
+function openStatsCustomRange() {
+  const endKey = hongKongDateKey(state.now);
+  const startKey = hongKongDateKey(new Date(startOfHongKongDay(state.now).getTime()-6*86400000));
+  state.statsCustomFrom = state.statsCustomFrom || startKey;
+  state.statsCustomTo = state.statsCustomTo || endKey;
+  state.statsCustomOpen = true;
+  render();
+}
+function closeStatsCustomRange() { state.statsCustomOpen = false; render(); }
+function applyStatsCustomRange() {
+  const from = parseTimestamp(`${state.statsCustomFrom} 00:00:00+08:00`);
+  let to = parseTimestamp(`${state.statsCustomTo} 23:59:59+08:00`);
+  if (to && to > state.now) to = state.now;
+  const days = from && to ? Math.floor((startOfHongKongDay(to)-startOfHongKongDay(from))/86400000)+1 : 0;
+  if (!from || !to || from > to || days < 1 || days > 30) {
+    showNotice(t("invalidRange"),`${state.statsCustomFrom || "--"} → ${state.statsCustomTo || "--"}`,"error");
+    return;
+  }
+  state.statsCustomOpen = false;
+  state.statsRangeMode = "custom";
+  loadStatsData({from:toHongKongTimestamp(from),to:toHongKongTimestamp(to),days},`custom:${state.statsCustomFrom}:${state.statsCustomTo}`);
+}
 function toggleLanguage() { state.lang = state.lang === "zh" ? "en" : "zh"; localStorage.setItem(STORAGE_KEYS.language,state.lang); render(); }
 function effectiveTime(scope) { return state.timeFollowing[scope] ? state.now : state.times[scope]; }
 function resetTimeFollowing(scope) { state.timeFollowing[scope] = true; state.times[scope] = new Date(); }
@@ -956,6 +1246,14 @@ function formatHeaderDate(date) {
   return `${p.month}月${p.day}日（${p.weekday}）`;
 }
 function formatRangeLabel(start,end) { return `${relativeDayLabel(start)} ${formatClock(start)} → ${relativeDayLabel(end)} ${formatClock(end)}`; }
+function hongKongDateKey(date) { const p=dateParts(date,{year:"numeric",month:"2-digit",day:"2-digit"}); return `${p.year}-${p.month}-${p.day}`; }
+function formatShortDate(date) { const p=dateParts(date,{month:"numeric",day:"numeric"}); return `${p.month}/${p.day}`; }
+function formatOne(value) { return Number(value || 0).toFixed(1).replace(/\.0$/,""); }
+function formatCompactDuration(ms) { const minutes=Math.round(ms/60000); return `${Math.floor(minutes/60)}h ${minutes%60}m`; }
+function statsRangeLabel() {
+  const from = parseTimestamp(state.statsFrom), to = parseTimestamp(state.statsTo);
+  return from && to ? `${formatShortDate(from)} – ${formatShortDate(to)}` : "";
+}
 function relativeDayLabel(date) { const day=startOfHongKongDay(date).getTime(),today=startOfHongKongDay(state.now).getTime(); if (day===today) return t("today"); if (day===today-86400000) return t("yesterday"); const p=dateParts(date,{month:"numeric",day:"numeric"}); return `${p.month}/${p.day}`; }
 function parseTimestamp(value) { if (!value) return null; if (value instanceof Date) return value; const date=new Date(String(value).replace(" ","T")); return Number.isNaN(date.getTime()) ? null : date; }
 function formatDuration(ms) { const total=Math.max(0,Math.floor(ms/1000)); return `${String(Math.floor(total/60)).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`; }

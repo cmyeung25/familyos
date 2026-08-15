@@ -17,6 +17,16 @@
     },
     "request_text": "BB 岩岩飲左 120 ml 奶"
   },
+  "baby_logs_paginated": {
+    "action": "query_baby_logs",
+    "payload": {
+      "from": "2026-08-10 00:00:00+08:00",
+      "to": "2026-08-16 23:59:59+08:00",
+      "limit": 100,
+      "cursor": ""
+    },
+    "request_text": "Load the first page of BB insight data"
+  },
   "shopping_batch": {
     "action": "record_inventory_purchase_batch",
     "payload": {

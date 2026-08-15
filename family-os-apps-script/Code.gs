@@ -163,6 +163,8 @@ function route_(action, payload, request) {
       return getMonthlyCashflow_(payload);
     case "get_recent_baby_logs":
       return getRecentBabyLogs_(payload);
+    case "query_baby_logs":
+      return queryBabyLogs_(payload);
     case "query_bb_calendar_events":
       return queryBbCalendarEvents_(payload);
     case "get_dashboard_snapshot":
@@ -350,6 +352,111 @@ function getRecentBabyLogs_(payload) {
   }).slice(-limit).reverse().map(function (row) {
     return compactBabyLog_(row);
   });
+}
+
+function queryBabyLogs_(payload) {
+  assertAllowedKeys_(payload, ["from", "to", "days", "log_type", "limit", "cursor"], "query_baby_logs");
+  const range = resolveBabyLogRange_(payload);
+  const limit = clampNumber_(payload.limit || 100, 1, 200);
+  const type = payload.log_type ? String(payload.log_type) : "";
+  const cursor = parseBabyLogCursor_(payload.cursor || "");
+
+  const rows = rowsAsObjects_("baby_log").filter(function (row) {
+    if (!row.baby_log_id || String(row.status || "active") === "deleted") return false;
+    if (type && String(row.log_type || "") !== type) return false;
+    const eventDate = parseDate_(row.event_at);
+    return eventDate && eventDate.getTime() >= range.from_ms && eventDate.getTime() <= range.to_ms;
+  }).sort(compareBabyLogsDescending_);
+
+  const eligible = cursor ? rows.filter(function (row) {
+    return babyLogComesAfterCursor_(row, cursor);
+  }) : rows;
+  const pageRows = eligible.slice(0, limit);
+  const hasMore = eligible.length > pageRows.length;
+  const lastRow = pageRows.length ? pageRows[pageRows.length - 1] : null;
+
+  return {
+    items: pageRows.map(compactBabyLog_),
+    range: {
+      from: range.from,
+      to: range.to,
+      days: range.days,
+    },
+    page: {
+      limit: limit,
+      count: pageRows.length,
+      has_more: hasMore,
+      next_cursor: hasMore && lastRow ? makeBabyLogCursor_(lastRow) : "",
+    },
+  };
+}
+
+function resolveBabyLogRange_(payload) {
+  const hasFrom = payload.from !== undefined && payload.from !== null && payload.from !== "";
+  const hasTo = payload.to !== undefined && payload.to !== null && payload.to !== "";
+  if (hasFrom !== hasTo) throw new Error("from and to must be provided together.");
+
+  let from;
+  let to;
+  if (hasFrom) {
+    from = timestamp_(payload.from);
+    to = timestamp_(payload.to);
+  } else {
+    const days = payload.days === undefined || payload.days === null || payload.days === ""
+      ? 7
+      : requireNumber_(payload.days, "days");
+    if (!Number.isInteger(days) || days < 1 || days > 30) throw new Error("days must be an integer from 1 to 30.");
+    to = now_();
+    const toDate = parseDate_(to);
+    from = Utilities.formatDate(new Date(toDate.getTime() - days * 86400000), FAMILY_OS.timezone, "yyyy-MM-dd HH:mm:ssXXX");
+  }
+
+  const fromDate = parseDate_(from);
+  const toDate = parseDate_(to);
+  if (!fromDate || !toDate || fromDate.getTime() >= toDate.getTime()) throw new Error("to must be after from.");
+  const spanDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000);
+  if (spanDays > 30) throw new Error("Baby log date range cannot exceed 30 days.");
+  return {
+    from: from,
+    to: to,
+    days: spanDays,
+    from_ms: fromDate.getTime(),
+    to_ms: toDate.getTime(),
+  };
+}
+
+function compareBabyLogsDescending_(left, right) {
+  const timeDifference = parseDate_(right.event_at).getTime() - parseDate_(left.event_at).getTime();
+  if (timeDifference) return timeDifference;
+  return String(right.baby_log_id || "").localeCompare(String(left.baby_log_id || ""));
+}
+
+function makeBabyLogCursor_(row) {
+  return encodeURIComponent(timestamp_(row.event_at) + "|" + String(row.baby_log_id || ""));
+}
+
+function parseBabyLogCursor_(value) {
+  if (!value) return null;
+  let decoded;
+  try {
+    decoded = decodeURIComponent(String(value));
+  } catch (error) {
+    throw new Error("Invalid baby log cursor.");
+  }
+  const divider = decoded.lastIndexOf("|");
+  if (divider <= 0 || divider === decoded.length - 1) throw new Error("Invalid baby log cursor.");
+  const eventAt = timestamp_(decoded.slice(0, divider));
+  return {
+    event_at: eventAt,
+    event_ms: parseDate_(eventAt).getTime(),
+    baby_log_id: decoded.slice(divider + 1),
+  };
+}
+
+function babyLogComesAfterCursor_(row, cursor) {
+  const eventMs = parseDate_(row.event_at).getTime();
+  if (eventMs !== cursor.event_ms) return eventMs < cursor.event_ms;
+  return String(row.baby_log_id || "").localeCompare(cursor.baby_log_id) < 0;
 }
 
 function queryBbCalendarEvents_(payload) {

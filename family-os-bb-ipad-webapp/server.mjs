@@ -13,6 +13,7 @@ const apiKey = process.env.FAMILY_OS_API_KEY || "";
 const allowedActions = new Set([
   "health",
   "get_recent_baby_logs",
+  "query_baby_logs",
   "append_baby_log",
   "update_baby_log",
   "delete_baby_log",
