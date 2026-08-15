@@ -1,4 +1,5 @@
 const HK_TZ = "Asia/Hong_Kong";
+const RECENT_RECORD_RESUME_GUARD_MS = 1500;
 const STORAGE_KEYS = {
   activeBottle: "family-os-bb-ipad:active-bottle",
   language: "family-os-bb-ipad:language",
@@ -34,7 +35,7 @@ const I18N = {
     milkTimerStarted: "已開始沖奶計時", feedSaving: "記錄飲奶", feedSuccess: "飲奶記錄成功", tempSaving: "記錄體溫", tempSuccess: "已成功記錄體溫", timerCleared: "已清除沖奶計時", localTimerRemoved: "本機計時已移除",
     switchLanguage: "Switch to English", settingsLabel: "設定", close: "關閉", checking: "檢查中", saveFailed: "儲存失敗", noValue: "沒有",
     startedDetail: "{ml} ml · {time} 開始{medicine}", medicineSuffix: " · 有餵藥", diaperDetail: "{time} · 尿尿{pee} · 便便{poo}",
-    editRecord: "修改記錄", editHint: "點按最近記錄可修改", recordDate: "記錄日期", saveChanges: "儲存修改", deleteRecord: "刪除記錄",
+    editRecord: "修改記錄", editShort: "修改", editHint: "按修改按鈕可更改記錄", recordDate: "記錄日期", saveChanges: "儲存修改", deleteRecord: "刪除記錄",
     deleteConfirmTitle: "確定刪除這筆記錄？", deleteConfirmBody: "記錄會從介面隱藏，原資料及更改歷史仍會保留。", cancel: "取消", confirmDelete: "確定刪除",
     recordUpdating: "正在更新記錄", recordUpdated: "記錄已更新", recordDeleting: "正在刪除記錄", recordDeleted: "記錄已刪除", unsupportedEdit: "這類記錄暫不支援修改",
     recordChanged: "記錄已在另一部裝置更改，請刷新後再試。", actualAmount: "實際飲奶量", changePreparedAmount: "沖奶量", previousDay: "前一日", nextDay: "後一日",
@@ -61,7 +62,7 @@ const I18N = {
     milkTimerStarted: "Milk timer started", feedSaving: "Saving feeding", feedSuccess: "Feeding saved", tempSaving: "Saving temperature", tempSuccess: "Temperature saved", timerCleared: "Milk timer cleared", localTimerRemoved: "Local timer removed",
     switchLanguage: "切換至中文", settingsLabel: "Settings", close: "Close", checking: "Checking", saveFailed: "Save failed", noValue: "None",
     startedDetail: "{ml} ml · started {time}{medicine}", medicineSuffix: " · medicine given", diaperDetail: "{time} · urine {pee} · stool {poo}",
-    editRecord: "Edit record", editHint: "Tap a recent record to edit", recordDate: "Record date", saveChanges: "Save changes", deleteRecord: "Delete record",
+    editRecord: "Edit record", editShort: "Edit", editHint: "Use the edit button to change a record", recordDate: "Record date", saveChanges: "Save changes", deleteRecord: "Delete record",
     deleteConfirmTitle: "Delete this record?", deleteConfirmBody: "It will be hidden from the app while the original data and change history remain available.", cancel: "Cancel", confirmDelete: "Delete",
     recordUpdating: "Updating record", recordUpdated: "Record updated", recordDeleting: "Deleting record", recordDeleted: "Record deleted", unsupportedEdit: "This record type cannot be edited yet",
     recordChanged: "This record changed on another device. Refresh and try again.", actualAmount: "Actual milk", changePreparedAmount: "Prepared milk", previousDay: "Previous day", nextDay: "Next day",
@@ -111,6 +112,7 @@ const languageButton = document.querySelector("#language-button");
 
 let lastTouchEnd = 0;
 let lastTouchTarget = null;
+let recentRecordLockedUntil = Date.now() + RECENT_RECORD_RESUME_GUARD_MS;
 document.addEventListener("touchend", (event) => {
   if (event.changedTouches.length !== 1) return;
   const now = Date.now();
@@ -122,7 +124,18 @@ document.addEventListener("touchend", (event) => {
 
 document.addEventListener("click", handleClick);
 window.addEventListener("online", () => refreshData("online"));
-window.addEventListener("focus", () => refreshData("focus"));
+window.addEventListener("focus", () => {
+  lockRecentRecordActions();
+  refreshData("focus");
+});
+window.addEventListener("pageshow", lockRecentRecordActions);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    recentRecordLockedUntil = Number.POSITIVE_INFINITY;
+    return;
+  }
+  lockRecentRecordActions();
+});
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js").catch(() => {});
@@ -164,7 +177,7 @@ function handleClick(event) {
   if (action === "save-temperature") saveTemperature();
   if (action === "dismiss-submit") dismissSubmit();
   if (action === "timeline-filter") setTimelineFilter(button.dataset.filter);
-  if (action === "open-record") openRecordEditor(button.dataset.id);
+  if (action === "open-record" && !recentRecordActionsLocked()) openRecordEditor(button.dataset.id);
   if (action === "close-record") closeRecordEditor();
   if (action === "edit-time-step") adjustRecordTime(Number(button.dataset.minutes));
   if (action === "edit-intensity") setRecordIntensity(button.dataset.kind, button.dataset.value);
@@ -417,9 +430,17 @@ function renderRecentItem(log) {
     : `${escapeHtml(log.title)}${log.medicineGiven ? iconHtml("medicine") : ""}`;
   const content = `${iconHtml(log.icon, log.utility)}<div><div class="recent-time">${formatClock(log.date)}</div><div class="age">${relativeAge(log.date)}</div></div><div><div class="recent-title">${title}</div><div class="recent-detail">${escapeHtml(log.detail)}</div></div>`;
   if (isEditableRecordType(log.type)) {
-    return `<button class="recent-item recent-item-button" type="button" data-action="open-record" data-id="${escapeHtml(log.id)}" aria-label="${t("editRecord")}: ${escapeHtml(log.title)}">${content}<div class="row-chevron">›</div></button>`;
+    return `<article class="recent-item recent-item-editable">${content}<button class="recent-edit-button" type="button" data-action="open-record" data-id="${escapeHtml(log.id)}" aria-label="${t("editRecord")}: ${escapeHtml(log.title)}">${t("editShort")}</button></article>`;
   }
   return `<article class="recent-item recent-item-static">${content}<div></div></article>`;
+}
+
+function lockRecentRecordActions() {
+  recentRecordLockedUntil = Date.now() + RECENT_RECORD_RESUME_GUARD_MS;
+}
+
+function recentRecordActionsLocked() {
+  return Date.now() < recentRecordLockedUntil;
 }
 
 function renderInsightsCard() {
