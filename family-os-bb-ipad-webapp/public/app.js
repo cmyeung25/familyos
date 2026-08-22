@@ -1320,12 +1320,13 @@ function resetTimeFollowing(scope) { state.timeFollowing[scope] = true; state.ti
 function currentBottle() { if (!state.activeBottle) return null; return {...state.activeBottle,preparedAt:new Date(state.activeBottle.preparedAt),expiresAt:new Date(state.activeBottle.expiresAt)}; }
 function activeBottlePreparedMl() { return currentBottle()?.preparedMl || state.preparedMl; }
 
-function normalizeLog(raw) {
-  const date = parseTimestamp(raw.event_at) || new Date();
-  const type = String(raw.log_type || "other");
-  const preparedMl = parseNumberFromRemarks(raw.remarks,"prepared_ml");
-  const medicineGiven = parseBooleanFromRemarks(raw.remarks,"medicine_given");
-  const diaper = parseDiaper(raw);
+function normalizeLog(input) {
+  const raw = input?.raw || input || {};
+  const date = input?.date instanceof Date ? input.date : parseTimestamp(input?.date || raw.event_at);
+  const type = String(input?.type || raw.log_type || "other");
+  const preparedMl = Number(input?.preparedMl) || parseNumberFromRemarks(raw.remarks,"prepared_ml");
+  const medicineGiven = input?.medicineGiven === true || parseBooleanFromRemarks(raw.remarks,"medicine_given");
+  const diaper = input?.diaper || parseDiaper(raw);
   let icon = "calendar", utility = true, title = raw.description || type, detail = raw.description || "";
   if (type === "feeding") { icon = "bottle"; utility = false; const actual = Number(raw.value_number || 0); title = preparedMl ? `${actual} / ${preparedMl} ml` : `${actual} ml`; detail = t("feedingRecord"); }
   if (type === "diaper") { icon = diaper.poo !== "none" ? "poo" : "pee"; utility = false; title = t("diaper"); detail = t("diaperRecord"); }

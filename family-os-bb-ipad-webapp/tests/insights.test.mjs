@@ -24,6 +24,21 @@ test("derives an overnight sleep proxy around the 04:00 Hong Kong boundary", () 
   assert.equal(sessions[0].durationMs, 2 * 60 * 60 * 1000 + 40 * 60 * 1000);
 });
 
+test("keeps the original API event_at in an expanded night insight", () => {
+  const sessions = buildNightSleepWindows([
+    { log_type: "feeding", event_at: "2026-08-20T23:30:00+08:00", value_number: 120 },
+    { log_type: "feeding", event_at: "2026-08-21T03:30:00+08:00", value_number: 120 },
+    { log_type: "feeding", event_at: "2026-08-21T07:10:00+08:00", value_number: 120 },
+  ], {
+    from: "2026-08-21T00:00:00+08:00",
+    to: "2026-08-21T12:00:00+08:00",
+    now: "2026-08-21T12:00:00+08:00",
+  });
+
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions[0].lastFeedAt.toISOString(), "2026-08-20T19:30:00.000Z");
+});
+
 test("calculates rolling 26-hour milk totals independently of midnight", () => {
   const points = buildRollingMilkSeries([
     feed("2026-08-20T23:30:00+08:00", 120),

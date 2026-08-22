@@ -27,8 +27,14 @@ function hongKongDayStart(value) {
 
 function feedingEvents(logs) {
   return logs
-    .filter((log) => log?.type === "feeding")
-    .map((log) => ({ ...log, date: asDate(log.date), milk: Number(log.raw?.value_number || 0) }))
+    .filter((log) => (log?.type ?? log?.raw?.log_type ?? log?.log_type) === "feeding")
+    .map((log) => ({
+      ...log,
+      // The expanded view may receive raw API records or already-normalized PWA records.
+      // Never substitute an invalid event time with the current time in an insight.
+      date: asDate(log.date ?? log.raw?.event_at ?? log.event_at),
+      milk: Number(log.milk ?? log.raw?.value_number ?? log.value_number ?? 0),
+    }))
     .filter((log) => log.date && Number.isFinite(log.milk))
     .sort((left, right) => left.date - right.date);
 }
