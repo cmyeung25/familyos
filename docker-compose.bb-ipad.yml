@@ -6,6 +6,7 @@ services:
     image: familyos:bb-ipad
     env_file:
       - ./instances/gary/secrets/bb-ipad.env
+      - ./instances/gary/secrets/bb-data-api-client.env
     environment:
       FAMILY_OS_BB_IPAD_PORT: 8790
       NODE_ENV: production
@@ -13,9 +14,33 @@ services:
     ports:
       - "127.0.0.1:8791:8790"
     restart: unless-stopped
+    depends_on:
+      familyos-bb-data-api:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8790/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  familyos-bb-data-api:
+    build:
+      context: ./family-os-bb-data-api
+      dockerfile: Dockerfile
+    image: familyos:bb-data-api
+    env_file:
+      - ./instances/gary/secrets/bb-mariadb.env
+      - ./instances/gary/secrets/bb-data-api.env
+    environment:
+      FAMILY_OS_BB_DATA_API_PORT: 8788
+      NODE_ENV: production
+    expose:
+      - "8788"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

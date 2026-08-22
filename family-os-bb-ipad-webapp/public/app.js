@@ -867,7 +867,8 @@ async function runSave(key,requestText,payload,afterSave,display) {
   state.submitFlow = {status:"saving",icon:display.icon,savingTitle:display.savingTitle,kind:key};
   render();
   try {
-    const result = await callApi("append_baby_log",payload,requestText);
+    const clientRequestId = typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : "";
+    const result = await callApi("append_baby_log",{...payload,client_request_id:clientRequestId},requestText);
     afterSave?.(result);
     state.saving = "";
     state.submitFlow = {status:"success",icon:"check",successTitle:display.successTitle,detail:display.detail,countdown:key === "temperature" ? 2 : 0,kind:key};

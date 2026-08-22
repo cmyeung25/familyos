@@ -6,11 +6,14 @@ import { fileURLToPath } from "node:url";
 const serverPath = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const appPath = fileURLToPath(new URL("../public/app.js", import.meta.url));
 
-test("iPad health contract reports the implemented Apps Script and Sheets data path", async () => {
+test("iPad health contract follows the configured backend and never treats the setting as a display-only label", async () => {
   const server = await readFile(serverPath, "utf8");
 
-  assert.match(server, /const dataPath = Object\.freeze\(\{ api: "apps_script", storage: "google_sheets" \}\)/);
-  assert.match(server, /data_path: dataPath/);
+  assert.match(server, /FAMILY_OS_BB_DATA_BACKEND/);
+  assert.match(server, /dataBackend === "apps_script"/);
+  assert.match(server, /dataBackend === "mariadb"/);
+  assert.match(server, /callConfiguredDataApi/);
+  assert.match(server, /FAMILY_OS_BB_DATA_API_URL and FAMILY_OS_BB_DATA_API_KEY/);
 });
 
 test("settings maps only known backend and storage pairs to user-facing labels", async () => {

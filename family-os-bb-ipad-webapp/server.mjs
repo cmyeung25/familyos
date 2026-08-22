@@ -7,10 +7,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
 const port = Number(process.env.FAMILY_OS_BB_IPAD_PORT || process.env.PORT || 8787);
-const apiUrl = process.env.FAMILY_OS_API_URL || "";
-const apiKey = process.env.FAMILY_OS_API_KEY || "";
-// This is the concrete route implemented by this server, not a user-controlled label.
-const dataPath = Object.freeze({ api: "apps_script", storage: "google_sheets" });
+const appsScriptApiUrl = process.env.FAMILY_OS_API_URL || "";
+const appsScriptApiKey = process.env.FAMILY_OS_API_KEY || "";
+const dataBackend = String(process.env.FAMILY_OS_BB_DATA_BACKEND || "apps_script").trim();
+const bbDataApiUrl = String(process.env.FAMILY_OS_BB_DATA_API_URL || "").replace(/\/$/, "");
+const bbDataApiKey = process.env.FAMILY_OS_BB_DATA_API_KEY || "";
 
 const allowedActions = new Set([
   "health",
@@ -70,17 +71,17 @@ function readBody(req) {
 }
 
 async function callFamilyOsApi(action, payload = {}, requestText = "") {
-  if (!apiUrl || !apiKey) {
+  if (!appsScriptApiUrl || !appsScriptApiKey) {
     const error = new Error("FAMILY_OS_API_URL and FAMILY_OS_API_KEY are required.");
     error.statusCode = 503;
     throw error;
   }
 
-  const response = await fetch(apiUrl, {
+  const response = await fetch(appsScriptApiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      api_key: apiKey,
+      api_key: appsScriptApiKey,
       action,
       payload,
       request_text: requestText || "iPad BB App",
@@ -104,6 +105,56 @@ async function callFamilyOsApi(action, payload = {}, requestText = "") {
   }
 
   return data;
+}
+
+async function callBbDataApi(action, payload = {}, requestText = "") {
+  if (!bbDataApiUrl || !bbDataApiKey) {
+    const error = new Error("FAMILY_OS_BB_DATA_API_URL and FAMILY_OS_BB_DATA_API_KEY are required for MariaDB mode.");
+    error.statusCode = 503;
+    throw error;
+  }
+  const response = await fetch(`${bbDataApiUrl}/v1/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: bbDataApiKey,
+      action,
+      payload,
+      request_text: requestText || "iPad BB App",
+    }),
+  });
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    const error = new Error(`BB Data API returned non-JSON response (${response.status}).`);
+    error.statusCode = 502;
+    throw error;
+  }
+  if (!response.ok || data.ok !== true) {
+    const error = new Error(data.error || `BB Data API request failed (${response.status}).`);
+    error.statusCode = response.ok ? 502 : response.status;
+    throw error;
+  }
+  return data;
+}
+
+function configuredDataPath() {
+  if (dataBackend === "apps_script") return { api: "apps_script", storage: "google_sheets" };
+  if (dataBackend === "mariadb") return { api: "bb_data_api", storage: "mariadb" };
+  const error = new Error("FAMILY_OS_BB_DATA_BACKEND must be apps_script or mariadb.");
+  error.statusCode = 503;
+  throw error;
+}
+
+async function callConfiguredDataApi(action, payload = {}, requestText = "") {
+  const path = configuredDataPath();
+  const data = path.api === "bb_data_api"
+    ? await callBbDataApi(action, payload, requestText)
+    : await callFamilyOsApi(action, payload, requestText);
+  if (action !== "health" || data.result?.data_path) return data;
+  return { ...data, result: { ...(data.result || {}), data_path: path } };
 }
 
 function staticPathFromUrl(url) {
@@ -151,14 +202,8 @@ async function serveStatic(req, res) {
 async function handleApi(req, res) {
   try {
     if (req.method === "GET" && req.url === "/api/health") {
-      const data = await callFamilyOsApi("health", {}, "iPad BB App health check");
-      sendJson(res, 200, {
-        ...data,
-        result: {
-          ...(data.result || {}),
-          data_path: dataPath,
-        },
-      });
+      const data = await callConfiguredDataApi("health", {}, "iPad BB App health check");
+      sendJson(res, 200, data);
       return;
     }
 
@@ -175,7 +220,7 @@ async function handleApi(req, res) {
       return;
     }
 
-    const data = await callFamilyOsApi(action, request.payload || {}, request.request_text || "");
+    const data = await callConfiguredDataApi(action, request.payload || {}, request.request_text || "");
     sendJson(res, 200, data);
   } catch (error) {
     sendJson(res, error.statusCode || 500, {
@@ -190,7 +235,10 @@ const server = createServer(async (req, res) => {
     sendJson(res, 200, {
       ok: true,
       service: "family-os-bb-ipad",
-      api_configured: Boolean(apiUrl && apiKey),
+      data_backend: dataBackend,
+      api_configured: dataBackend === "mariadb"
+        ? Boolean(bbDataApiUrl && bbDataApiKey)
+        : Boolean(appsScriptApiUrl && appsScriptApiKey),
     });
     return;
   }

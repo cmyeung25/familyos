@@ -243,7 +243,8 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - no Brother BB database
 - Current implementation note:
   - Synology MariaDB 10.11 now has the Gary-only `familyos_gary_bb` schema and restricted `familyos_gary_bb_app` accounts for `localhost` and Docker `172.*` networks.
-  - No historical data, BB Data API, iPad runtime, or Dobby BB-log cutover has been performed.
+  - A NAS-internal BB Data API and idempotent Apps Script-to-MariaDB migration job are implemented for typed feeding, diaper, and temperature records; deployment and live migration remain pending.
+  - Dobby has no MariaDB BB-log access. Non-iPad legacy types such as vaccination and clinic visit remain in Google Sheets during this phase.
 
 ## Immediate Next Milestones
 
