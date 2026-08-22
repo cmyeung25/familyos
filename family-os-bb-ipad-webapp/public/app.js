@@ -1,3 +1,5 @@
+import { buildNightSleepWindows, buildRollingMilkSeries, summarizePooIntensity } from "./insights.mjs";
+
 const HK_TZ = "Asia/Hong_Kong";
 const RECENT_RECORD_RESUME_GUARD_MS = 1500;
 const STORAGE_KEYS = {
@@ -42,8 +44,8 @@ const I18N = {
     times: "次", hour10: "10時", hour14: "14時", hour16: "16時", hour18: "18時", hour22: "22時", hour02: "02時", hour04: "04時", hour06: "06時",
     statsTitle: "統計與趨勢", statsSubtitle: "掌握小桃B最近生活節奏與變化", statsToday: "今日", stats7: "7日", stats30: "30日", statsCustom: "自訂", statsLoading: "正在載入統計資料…", statsAverage: "平均", recentAverage: "近期日均",
     perDay: "/ 日", comparedWithAverage: "今日較日均 {delta}", closeToAverage: "與近期日均接近", aboveAverage: "較近期日均多 {value}", belowAverage: "較近期日均少 {value}", noComparison: "未有足夠資料比較",
-    lifeTimeline: "24 小時生活時間軸", summaryToday: "今日摘要", versusAverage: "今日 vs {days}日平均", milkTrend: "每日奶量趨勢", diaperTrend: "尿片與大便次數", temperatureTrend: "體溫趨勢", feedDistribution: "每餐奶量分佈", rawRecent: "最近記錄",
-    urineShort: "尿片", stoolShort: "大便", latestTemp: "最新體溫", avgDaily: "日均", totalFeeds: "總餵奶次數", averageInterval: "平均間隔", dateRange: "日期範圍", startDate: "開始日期", endDate: "結束日期", applyRange: "套用日期", invalidRange: "日期範圍必須為 1 至 30 日",
+    lifeTimeline: "24 小時生活時間軸", summaryToday: "今日摘要", versusAverage: "今日 vs {days}日平均", milkTrend: "每日奶量與次數", rollingMilkTrend: "26 小時滾動奶量", diaperTrend: "尿片與大便次數", sleepRhythm: "夜間作息（以餵奶推算）", sleepHeuristic: "3:00 前最後一餐 → 3:00 後第一餐", sleepBedtime: "入睡", sleepWake: "起床", sleepDuration: "夜眠", sleepNoData: "未有足夠餵奶記錄推算夜眠", temperatureTrend: "體溫趨勢", feedDistribution: "每餐奶量分佈", rawRecent: "最近記錄",
+    urineShort: "尿片", stoolShort: "大便", latestTemp: "最新體溫", avgDaily: "日均", totalFeeds: "總餵奶次數", feedsShort: "次", averageInterval: "平均間隔", rollingCurrent: "現在 26 小時", rollingAverage: "滾動平均", pooVolume: "便便分量", pooLoad: "分量指數", smallShort: "少", mediumShort: "中", largeShort: "多", dateRange: "日期範圍", startDate: "開始日期", endDate: "結束日期", applyRange: "套用日期", invalidRange: "日期範圍必須為 1 至 30 日",
     milkNearInsight: "奶量與小桃B近期日均接近", milkHighInsight: "今日奶量較近期日均多", milkLowInsight: "今日奶量較近期日均少", pooHighInsight: "今日大便次數較近期多", pooNearInsight: "大便次數與近期日均接近", tempInsight: "最新體溫為 {value}", noDataInsight: "這個範圍未有足夠記錄",
   },
   en: {
@@ -74,8 +76,8 @@ const I18N = {
     times: "times", hour10: "10h", hour14: "14h", hour16: "16h", hour18: "18h", hour22: "22h", hour02: "02h", hour04: "04h", hour06: "06h",
     statsTitle: "Insights & trends", statsSubtitle: "See Siu To B's recent rhythm and changes", statsToday: "Today", stats7: "7 days", stats30: "30 days", statsCustom: "Custom", statsLoading: "Loading insight data…", statsAverage: "Average", recentAverage: "Recent daily avg",
     perDay: "/ day", comparedWithAverage: "Today vs daily avg {delta}", closeToAverage: "Close to recent daily avg", aboveAverage: "{value} above recent avg", belowAverage: "{value} below recent avg", noComparison: "Not enough data to compare",
-    lifeTimeline: "24-hour life timeline", summaryToday: "Today summary", versusAverage: "Today vs {days}-day avg", milkTrend: "Daily milk trend", diaperTrend: "Urine and stool counts", temperatureTrend: "Temperature trend", feedDistribution: "Feed amount distribution", rawRecent: "Recent logs",
-    urineShort: "Urine", stoolShort: "Stool", latestTemp: "Latest temperature", avgDaily: "Daily avg", totalFeeds: "Total feeds", averageInterval: "Average interval", dateRange: "Date range", startDate: "Start date", endDate: "End date", applyRange: "Apply range", invalidRange: "Date range must be between 1 and 30 days",
+    lifeTimeline: "24-hour life timeline", summaryToday: "Today summary", versusAverage: "Today vs {days}-day avg", milkTrend: "Daily milk and feeds", rollingMilkTrend: "Rolling 26-hour milk", diaperTrend: "Urine and stool counts", sleepRhythm: "Night rhythm (estimated from feeds)", sleepHeuristic: "Last feed before 03:00 → first feed after 03:00", sleepBedtime: "Bedtime", sleepWake: "Wake", sleepDuration: "Night sleep", sleepNoData: "Not enough feeding logs to estimate night sleep", temperatureTrend: "Temperature trend", feedDistribution: "Feed amount distribution", rawRecent: "Recent logs",
+    urineShort: "Urine", stoolShort: "Stool", latestTemp: "Latest temperature", avgDaily: "Daily avg", totalFeeds: "Total feeds", feedsShort: "feeds", averageInterval: "Average interval", rollingCurrent: "Current 26 hours", rollingAverage: "Rolling avg", pooVolume: "Stool volume", pooLoad: "Volume score", smallShort: "S", mediumShort: "M", largeShort: "L", dateRange: "Date range", startDate: "Start date", endDate: "End date", applyRange: "Apply range", invalidRange: "Date range must be between 1 and 30 days",
     milkNearInsight: "Milk is close to Siu To B's recent daily average", milkHighInsight: "Today's milk is above the recent daily average", milkLowInsight: "Today's milk is below the recent daily average", pooHighInsight: "Today's stool count is above the recent average", pooNearInsight: "Stool count is close to the recent daily average", tempInsight: "Latest temperature is {value}", noDataInsight: "Not enough logs in this range",
   },
 };
@@ -593,7 +595,10 @@ function renderTimelinePage() {
     return `<div class="timeline-page"><section class="stats-dashboard"><div class="stats-toolbar"><div><h2>${t("statsTitle")}</h2><p>${t("statsSubtitle")}</p></div>${renderStatsRangeControls(rangeButtons)}</div><div class="stats-loading">${t("statsLoading")}</div></section></div>`;
   }
 
-  const logs = state.statsLogs.map(normalizeLog).filter((log) => log.date <= state.now);
+  const statsFrom = parseTimestamp(state.statsFrom) || new Date(state.now.getTime()-6*86400000);
+  const statsTo = parseTimestamp(state.statsTo) || state.now;
+  const allLogs = state.statsLogs.map(normalizeLog).filter((log) => log.date <= state.now);
+  const logs = allLogs.filter((log) => log.date >= statsFrom && log.date <= statsTo);
   const series = buildStatsDailySeries(logs);
   const todayKey = hongKongDateKey(state.now);
   const todayRow = series.find((row) => row.key === todayKey) || emptyStatsDay(todayKey);
@@ -606,6 +611,10 @@ function renderTimelinePage() {
   const averageTemperature = temperatures.length ? temperatures.reduce((sum,log) => sum + Number(log.raw.value_number || 0),0) / temperatures.length : 0;
   const recentLogs = logs.slice().sort((left,right) => right.date-left.date).slice(0,3);
   const comparisonDays = Math.max(1, baselineRows.length || series.length);
+  const sleepSessions = buildNightSleepWindows(allLogs,{from:statsFrom,to:statsTo,now:state.now});
+  const visibleSleepSessions = sleepSessions.filter((session) => session.inRange);
+  const sleepDisplay = visibleSleepSessions.length ? visibleSleepSessions : sleepSessions.slice(-1);
+  const rollingMilk = buildRollingMilkSeries(allLogs,{from:statsFrom,to:statsTo,windowHours:26});
 
   return `<div class="timeline-page"><section class="stats-dashboard ${state.statsLoading ? "is-loading" : ""}">
     <div class="stats-toolbar">
@@ -620,11 +629,13 @@ function renderTimelinePage() {
     </div>
     <div class="stats-row stats-rhythm-row">
       <article class="stats-card stats-life-card"><h3>${t("lifeTimeline")}</h3>${renderLifeSwimlane(logs)}</article>
+      <article class="stats-card stats-sleep-card"><h3>${t("sleepRhythm")}</h3>${renderNightSleepRhythm(sleepDisplay)}</article>
       <article class="stats-card stats-summary-card"><h3>${t("summaryToday")}</h3><div class="stats-summary-body">${renderStatsInsights(todayRow,baseline,latestTemperature)}${renderTodayComparison(todayRow,baseline,comparisonDays)}</div></article>
     </div>
     <div class="stats-row stats-chart-row">
       <article class="stats-card"><h3>${t("milkTrend")}</h3>${renderMilkTrend(series,logs)}</article>
-      <article class="stats-card"><h3>${t("diaperTrend")}</h3>${renderDiaperTrend(series)}</article>
+      <article class="stats-card"><h3>${t("rollingMilkTrend")}</h3>${renderRollingMilkTrend(rollingMilk)}</article>
+      <article class="stats-card"><h3>${t("diaperTrend")}</h3>${renderDiaperTrend(series,logs)}</article>
     </div>
     <div class="stats-row stats-detail-row">
       <article class="stats-card"><h3>${t("feedDistribution")}</h3>${renderFeedDistribution(logs)}</article>
@@ -713,6 +724,13 @@ function renderGroupedTimelineMarkers(logs,start,end,icon) {
   return [...groups.values()].map((group) => `<span class="swimlane-marker" style="left:${group.percentage}%">${iconHtml(icon)}${group.total > 1 ? `<b>${group.total}</b>` : ""}</span>`).join("");
 }
 
+function renderNightSleepRhythm(sessions) {
+  if (!sessions.length) return `<div class="night-sleep-empty"><p>${t("sleepNoData")}</p><span>${t("sleepHeuristic")}</span></div>`;
+  const latest = sessions.at(-1);
+  const history = sessions.slice(-3).reverse();
+  return `<div class="night-sleep-rhythm"><p class="night-sleep-rule">${t("sleepHeuristic")}</p><div class="night-sleep-main"><div><span>${t("sleepBedtime")}</span><b>${formatClock(latest.bedtime)}</b></div><strong>${formatCompactDuration(latest.durationMs)}</strong><div><span>${t("sleepWake")}</span><b>${formatClock(latest.wake)}</b></div></div><div class="night-sleep-history">${history.map((session) => `<span><b>${formatShortDate(session.wake)}</b> ${formatClock(session.bedtime)}–${formatClock(session.wake)} · ${formatCompactDuration(session.durationMs)}</span>`).join("")}</div></div>`;
+}
+
 function renderStatsInsights(today,baseline,latestTemperature) {
   if (!today.milk && !today.pee && !today.poo && !latestTemperature) return `<div class="insight-list"><p>${t("noDataInsight")}</p></div>`;
   const milkRatio = baseline.milk ? today.milk/baseline.milk : 1;
@@ -733,16 +751,28 @@ function renderMilkTrend(series,logs) {
   const intervals = feedLogs.slice(1).map((log,index) => log.date-feedLogs[index].date).filter((value) => value > 0 && value < 12*3600000);
   const averageInterval = intervals.length ? intervals.reduce((sum,value) => sum+value,0)/intervals.length : 0;
   const feeds = series.reduce((sum,row) => sum+row.feeds,0);
-  return `${renderDailyBars(series,(row) => row.milk,max,"milk")}<div class="chart-foot-stats"><span>${iconHtml("bottle")}<b>${feeds}</b> ${t("totalFeeds")}</span><span><b>${feeds ? Math.round(series.reduce((sum,row) => sum+row.milk,0)/feeds) : 0} ml</b> ${t("average")}</span><span><b>${averageInterval ? formatCompactDuration(averageInterval) : "--"}</b> ${t("averageInterval")}</span><span class="chart-average">${t("avgDaily")} ${Math.round(average)} ml</span></div>`;
+  return `${renderMilkBars(series,max)}<div class="chart-foot-stats milk-foot-stats"><span>${iconHtml("bottle")}<b>${feeds}</b> ${t("totalFeeds")}</span><span><b>${feeds ? Math.round(series.reduce((sum,row) => sum+row.milk,0)/feeds) : 0} ml</b> ${t("average")}</span><span><b>${averageInterval ? formatCompactDuration(averageInterval) : "--"}</b> ${t("averageInterval")}</span><span class="chart-average">${t("avgDaily")} ${Math.round(average)} ml</span></div>`;
 }
 
-function renderDailyBars(series,valueFor,max,tone) {
-  return `<div class="daily-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const value=valueFor(row); const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="daily-bar-column"><span class="daily-bar-value">${value || ""}</span><span class="daily-bar ${tone}" style="height:${Math.max(value ? 8 : 2,Math.round(value/max*72))}%"></span><span class="daily-bar-label">${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div>`;
+function renderMilkBars(series,max) {
+  return `<div class="daily-chart milk-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="daily-bar-column"><div class="daily-bar-metrics"><span class="daily-bar-value">${row.milk || ""}</span>${row.feeds ? `<span class="feed-count-badge">${row.feeds}${t("feedsShort")}</span>` : ""}</div><span class="daily-bar milk" style="height:${Math.max(row.milk ? 8 : 2,Math.round(row.milk/max*72))}%"></span><span class="daily-bar-label">${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div>`;
 }
 
-function renderDiaperTrend(series) {
+function renderRollingMilkTrend(points) {
+  if (!points.length) return `<p class="stats-empty">${t("noRecent")}</p>`;
+  const max = Math.max(1,...points.map((point) => point.milk));
+  const average = points.reduce((sum,point) => sum+point.milk,0)/points.length;
+  const width = 340, height = 58;
+  const coordinates = points.map((point,index) => ({...point,x:points.length === 1 ? width/2 : index/(points.length-1)*width,y:height-(point.milk/max*height)}));
+  const latest = points.at(-1);
+  const labels = [points[0],points[Math.floor(points.length/2)],latest].filter((point,index,all) => index === 0 || point.date.getTime() !== all[index-1].date.getTime());
+  return `<div class="rolling-chart"><svg viewBox="0 0 ${width} 78" role="img" aria-label="${t("rollingMilkTrend")}"><path d="M0,${height} L${coordinates.map((point) => `${point.x},${point.y}`).join(" L")} L${width},${height} Z" class="rolling-area"/><polyline points="${coordinates.map((point) => `${point.x},${point.y}`).join(" ")}" class="rolling-line"/>${coordinates.filter((_,index) => index === coordinates.length-1 || index % Math.max(1,Math.floor(coordinates.length/5)) === 0).map((point) => `<circle cx="${point.x}" cy="${point.y}" r="2.4"/>`).join("")}</svg><div class="rolling-labels">${labels.map((point) => `<span>${formatShortDate(point.date)} ${formatClock(point.date)}</span>`).join("")}</div></div><div class="chart-foot-stats rolling-foot-stats"><span><b>${latest.milk} ml</b> ${t("rollingCurrent")}</span><span><b>${latest.feeds}</b> ${t("feedsShort")}</span><span class="chart-average">${t("rollingAverage")} ${Math.round(average)} ml</span></div>`;
+}
+
+function renderDiaperTrend(series,logs) {
   const max = Math.max(1,...series.flatMap((row) => [row.pee,row.poo]));
-  return `<div class="grouped-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="grouped-column"><div><span class="grouped-bar pee" style="height:${Math.max(row.pee ? 8 : 2,Math.round(row.pee/max*72))}%"><b>${row.pee || ""}</b></span><span class="grouped-bar poo" style="height:${Math.max(row.poo ? 8 : 2,Math.round(row.poo/max*72))}%"><b>${row.poo || ""}</b></span></div><span>${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div><div class="chart-legend"><span>${iconHtml("pee")}${t("urineShort")}</span><span>${iconHtml("poo")}${t("stoolShort")}</span></div>`;
+  const poo = summarizePooIntensity(logs);
+  return `<div class="grouped-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="grouped-column"><div><span class="grouped-bar pee" style="height:${Math.max(row.pee ? 8 : 2,Math.round(row.pee/max*72))}%"><b>${row.pee || ""}</b></span><span class="grouped-bar poo" style="height:${Math.max(row.poo ? 8 : 2,Math.round(row.poo/max*72))}%"><b>${row.poo || ""}</b></span></div><span>${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div><div class="diaper-foot"><div class="chart-legend"><span>${iconHtml("pee")}${t("urineShort")}</span><span>${iconHtml("poo")}${t("stoolShort")}</span></div><div class="poo-volume-summary"><span>${t("pooVolume")}</span><b>${t("smallShort")}${poo.counts.small} · ${t("mediumShort")}${poo.counts.medium} · ${t("largeShort")}${poo.counts.large}</b><em>${t("pooLoad")} ${poo.weightedScore}</em></div></div>`;
 }
 
 function renderFeedDistribution(logs) {
@@ -787,11 +817,11 @@ async function refreshData(reason) {
     state.apiStatus = { ok:true, text:`${health.household_id || "hh_home"} · ${health.schema_version || "schema ok"}`, textKey:"" };
     state.dataPath = health.data_path || null;
     const request = statsRequestForDays(7);
-    const logs = await fetchBabyLogPages(request,"iPad BB App 7-day refresh");
-    state.logs = logs;
+    const statsData = await fetchStatsLogSet(request,"iPad BB App 7-day refresh");
+    state.logs = statsData.displayLogs;
     localStorage.setItem(STORAGE_KEYS.logs,JSON.stringify(state.logs));
     if (!state.statsLoadedKey || state.statsRangeMode === "7") {
-      state.statsLogs = logs;
+      state.statsLogs = statsData.logs;
       state.statsFrom = request.from;
       state.statsTo = request.to;
       state.statsLoadedKey = "7";
@@ -822,6 +852,29 @@ async function fetchBabyLogPages(request,requestText) {
   }
 }
 
+function dedupeBabyLogs(logs) {
+  const seen = new Set();
+  return logs.filter((log) => {
+    const key = String(log?.baby_log_id || `${log?.event_at || ""}:${log?.log_type || ""}:${log?.created_at || ""}`);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function fetchStatsLogSet(request,requestText) {
+  const displayLogs = await fetchBabyLogPages(request,requestText);
+  const displayFrom = parseTimestamp(request.from);
+  if (!displayFrom) return {displayLogs,logs:displayLogs};
+  const contextRequest = {
+    from: toHongKongTimestamp(new Date(displayFrom.getTime()-26*3600000)),
+    to: request.from,
+    days: 2,
+  };
+  const contextLogs = await fetchBabyLogPages(contextRequest,`${requestText} rolling-26 context`);
+  return {displayLogs,logs:dedupeBabyLogs([...contextLogs,...displayLogs])};
+}
+
 function statsRequestForDays(days) {
   const end = state.now;
   const start = new Date(startOfHongKongDay(end).getTime()-(days-1)*86400000);
@@ -833,8 +886,8 @@ async function loadStatsData(request,key) {
   state.statsLoading = true;
   render();
   try {
-    const logs = await fetchBabyLogPages(request,`iPad BB App insights ${key}`);
-    state.statsLogs = logs;
+    const statsData = await fetchStatsLogSet(request,`iPad BB App insights ${key}`);
+    state.statsLogs = statsData.logs;
     state.statsFrom = request.from;
     state.statsTo = request.to;
     state.statsLoadedKey = key;

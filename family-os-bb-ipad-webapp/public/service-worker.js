@@ -1,9 +1,10 @@
-const CACHE_NAME = "family-os-bb-ipad-v15";
+const CACHE_NAME = "family-os-bb-ipad-v16";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
+  "/insights.mjs",
   "/manifest.webmanifest",
   "/assets/app-icon-32.png",
   "/assets/app-icon-180.png",
@@ -35,6 +36,7 @@ const NETWORK_FIRST = new Set([
   "/index.html",
   "/styles.css",
   "/app.js",
+  "/insights.mjs",
   "/manifest.webmanifest",
 ]);
 
