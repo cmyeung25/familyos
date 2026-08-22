@@ -23,3 +23,9 @@ test("settings maps only known backend and storage pairs to user-facing labels",
   assert.match(app, /path\?\.api === "bb_data_api" && path\?\.storage === "mariadb"/);
   assert.match(app, /dataSourceUnknown/);
 });
+
+test("the PWA server serves browser modules with a JavaScript MIME type", async () => {
+  const server = await readFile(serverPath, "utf8");
+
+  assert.match(server, /\["\.mjs", "text\/javascript; charset=utf-8"\]/);
+});
