@@ -50,11 +50,14 @@ export function buildNightSleepWindows(logs, { from, to, now = new Date() } = {}
     const wake = feeds.find((feed) => feed.date >= boundary && feed.date <= current && feed.date <= new Date(boundary.getTime() + 15 * HOUR_MS));
     if (!bedtime || !wake) continue;
 
-    const durationMs = wake.date.getTime() - bedtime.date.getTime();
+    // The final feed is treated as a one-hour feeding session before sleep begins.
+    const sleepStart = new Date(bedtime.date.getTime() + HOUR_MS);
+    const durationMs = wake.date.getTime() - sleepStart.getTime();
     if (durationMs <= 0 || durationMs > 16 * HOUR_MS) continue;
     sessions.push({
       dateKey: hongKongDateKey(boundary),
-      bedtime: bedtime.date,
+      lastFeedAt: bedtime.date,
+      bedtime: sleepStart,
       wake: wake.date,
       durationMs,
       inRange: wake.date >= rangeFrom && wake.date <= rangeTo,

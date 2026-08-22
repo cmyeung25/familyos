@@ -44,7 +44,7 @@ const I18N = {
     times: "次", hour10: "10時", hour14: "14時", hour16: "16時", hour18: "18時", hour22: "22時", hour02: "02時", hour04: "04時", hour06: "06時",
     statsTitle: "統計與趨勢", statsSubtitle: "掌握小桃B最近生活節奏與變化", statsToday: "今日", stats7: "7日", stats30: "30日", statsCustom: "自訂", statsLoading: "正在載入統計資料…", statsAverage: "平均", recentAverage: "近期日均",
     perDay: "/ 日", comparedWithAverage: "今日較日均 {delta}", closeToAverage: "與近期日均接近", aboveAverage: "較近期日均多 {value}", belowAverage: "較近期日均少 {value}", noComparison: "未有足夠資料比較",
-    lifeTimeline: "24 小時生活時間軸", summaryToday: "今日摘要", versusAverage: "今日 vs {days}日平均", milkTrend: "每日奶量與次數", rollingMilkTrend: "26 小時滾動奶量", diaperTrend: "尿片與大便次數", sleepRhythm: "夜間作息（以餵奶推算）", sleepHeuristic: "4:00 前最後一餐 → 4:00 後第一餐", sleepBedtime: "入睡", sleepWake: "起床", sleepDuration: "夜眠", sleepNoData: "未有足夠餵奶記錄推算夜眠", temperatureTrend: "體溫趨勢", feedDistribution: "每餐奶量分佈", rawRecent: "最近記錄",
+    lifeTimeline: "24 小時生活時間軸", summaryToday: "今日摘要", versusAverage: "今日 vs {days}日平均", milkTrend: "每日奶量與次數", rollingMilkTrend: "26 小時滾動奶量", diaperTrend: "尿片與大便次數", sleepRhythm: "夜間作息（以餵奶推算）", sleepHeuristic: "4:00 前最後一餐後 1 小時 → 4:00 後第一餐", sleepBedtime: "入睡", sleepWake: "起床", sleepDuration: "夜眠", sleepNoData: "未有足夠餵奶記錄推算夜眠", expand: "放大", sleepLastFeed: "最後一餐", sleepRecent30: "最近 30 日", temperatureTrend: "體溫趨勢", feedDistribution: "每餐奶量分佈", rawRecent: "最近記錄",
     urineShort: "尿片", stoolShort: "大便", latestTemp: "最新體溫", avgDaily: "日均", totalFeeds: "總餵奶次數", feedsShort: "次", averageInterval: "平均間隔", rollingCurrent: "現在 26 小時", rollingAverage: "滾動平均", pooVolume: "便便分量", pooLoad: "分量指數", smallShort: "少", mediumShort: "中", largeShort: "多", dateRange: "日期範圍", startDate: "開始日期", endDate: "結束日期", applyRange: "套用日期", invalidRange: "日期範圍必須為 1 至 30 日",
     milkNearInsight: "奶量與小桃B近期日均接近", milkHighInsight: "今日奶量較近期日均多", milkLowInsight: "今日奶量較近期日均少", pooHighInsight: "今日大便次數較近期多", pooNearInsight: "大便次數與近期日均接近", tempInsight: "最新體溫為 {value}", noDataInsight: "這個範圍未有足夠記錄",
   },
@@ -76,7 +76,7 @@ const I18N = {
     times: "times", hour10: "10h", hour14: "14h", hour16: "16h", hour18: "18h", hour22: "22h", hour02: "02h", hour04: "04h", hour06: "06h",
     statsTitle: "Insights & trends", statsSubtitle: "See Siu To B's recent rhythm and changes", statsToday: "Today", stats7: "7 days", stats30: "30 days", statsCustom: "Custom", statsLoading: "Loading insight data…", statsAverage: "Average", recentAverage: "Recent daily avg",
     perDay: "/ day", comparedWithAverage: "Today vs daily avg {delta}", closeToAverage: "Close to recent daily avg", aboveAverage: "{value} above recent avg", belowAverage: "{value} below recent avg", noComparison: "Not enough data to compare",
-    lifeTimeline: "24-hour life timeline", summaryToday: "Today summary", versusAverage: "Today vs {days}-day avg", milkTrend: "Daily milk and feeds", rollingMilkTrend: "Rolling 26-hour milk", diaperTrend: "Urine and stool counts", sleepRhythm: "Night rhythm (estimated from feeds)", sleepHeuristic: "Last feed before 04:00 → first feed after 04:00", sleepBedtime: "Bedtime", sleepWake: "Wake", sleepDuration: "Night sleep", sleepNoData: "Not enough feeding logs to estimate night sleep", temperatureTrend: "Temperature trend", feedDistribution: "Feed amount distribution", rawRecent: "Recent logs",
+    lifeTimeline: "24-hour life timeline", summaryToday: "Today summary", versusAverage: "Today vs {days}-day avg", milkTrend: "Daily milk and feeds", rollingMilkTrend: "Rolling 26-hour milk", diaperTrend: "Urine and stool counts", sleepRhythm: "Night rhythm (estimated from feeds)", sleepHeuristic: "Last feed before 04:00 plus 1 hour → first feed after 04:00", sleepBedtime: "Bedtime", sleepWake: "Wake", sleepDuration: "Night sleep", sleepNoData: "Not enough feeding logs to estimate night sleep", expand: "Expand", sleepLastFeed: "Last feed", sleepRecent30: "Recent 30 days", temperatureTrend: "Temperature trend", feedDistribution: "Feed amount distribution", rawRecent: "Recent logs",
     urineShort: "Urine", stoolShort: "Stool", latestTemp: "Latest temperature", avgDaily: "Daily avg", totalFeeds: "Total feeds", feedsShort: "feeds", averageInterval: "Average interval", rollingCurrent: "Current 26 hours", rollingAverage: "Rolling avg", pooVolume: "Stool volume", pooLoad: "Volume score", smallShort: "S", mediumShort: "M", largeShort: "L", dateRange: "Date range", startDate: "Start date", endDate: "End date", applyRange: "Apply range", invalidRange: "Date range must be between 1 and 30 days",
     milkNearInsight: "Milk is close to Siu To B's recent daily average", milkHighInsight: "Today's milk is above the recent daily average", milkLowInsight: "Today's milk is below the recent daily average", pooHighInsight: "Today's stool count is above the recent average", pooNearInsight: "Stool count is close to the recent daily average", tempInsight: "Latest temperature is {value}", noDataInsight: "Not enough logs in this range",
   },
@@ -96,6 +96,11 @@ const state = {
   statsCustomOpen: false,
   statsCustomFrom: "",
   statsCustomTo: "",
+  insightModal: "",
+  insightModalLoading: false,
+  insightModalLogs: [],
+  insightModalFrom: "",
+  insightModalTo: "",
   apiStatus: { ok: null, text: "", textKey: "checking" },
   dataPath: null,
   logs: readJson(STORAGE_KEYS.logs, []),
@@ -204,6 +209,8 @@ function handleClick(event) {
   if (action === "open-custom-range") openStatsCustomRange();
   if (action === "close-custom-range") closeStatsCustomRange();
   if (action === "apply-custom-range") applyStatsCustomRange();
+  if (action === "open-insight") openInsight(button.dataset.insight);
+  if (action === "close-insight") closeInsight();
   if (action === "open-record" && !recentRecordActionsLocked()) openRecordEditor(button.dataset.id);
   if (action === "close-record") closeRecordEditor();
   if (action === "edit-time-step") adjustRecordTime(Number(button.dataset.minutes));
@@ -250,7 +257,7 @@ function render() {
   let page = renderPanel();
   if (state.activeTab === "timeline") page = renderTimelinePage();
   if (state.activeTab === "settings") page = renderSettingsPage();
-  app.innerHTML = `${page}${renderStatsCustomModal()}${renderTemperatureModal()}${renderFeedingModal()}${renderRecordEditorModal()}${renderSubmitOverlay()}`;
+  app.innerHTML = `${page}${renderStatsCustomModal()}${renderInsightDetailModal()}${renderTemperatureModal()}${renderFeedingModal()}${renderRecordEditorModal()}${renderSubmitOverlay()}`;
 }
 
 function renderNotice() {
@@ -589,6 +596,33 @@ function renderStatsCustomModal() {
   return `<div class="modal-backdrop"><section class="modal-card stats-date-modal" role="dialog" aria-modal="true" aria-labelledby="stats-date-title"><div class="modal-header"><h2 class="modal-title" id="stats-date-title">${iconHtml("calendar",true)}${t("dateRange")}</h2><button class="close-button" type="button" data-action="close-custom-range" aria-label="${t("close")}">×</button></div><div class="stats-date-fields"><label><span>${t("startDate")}</span><input type="date" data-stats-date="from" value="${escapeHtml(state.statsCustomFrom)}"></label><label><span>${t("endDate")}</span><input type="date" data-stats-date="to" value="${escapeHtml(state.statsCustomTo)}"></label></div><button class="primary-button" type="button" data-action="apply-custom-range">${t("applyRange")}</button></section></div>`;
 }
 
+function renderInsightDetailModal() {
+  if (!state.insightModal) return "";
+  const titles = { sleep: t("sleepRhythm"), milk: t("milkTrend"), rolling: t("rollingMilkTrend"), diaper: t("diaperTrend") };
+  const title = titles[state.insightModal] || t("statsTitle");
+  if (state.insightModalLoading) {
+    return `<div class="modal-backdrop insight-modal-backdrop"><section class="modal-card insight-detail-modal" role="dialog" aria-modal="true" aria-labelledby="insight-detail-title"><div class="modal-header"><h2 class="modal-title" id="insight-detail-title">${title}</h2><button class="close-button" type="button" data-action="close-insight" aria-label="${t("close")}">×</button></div><div class="insight-detail-loading">${t("statsLoading")}</div></section></div>`;
+  }
+
+  const rangeFrom = parseTimestamp(state.insightModalFrom || state.statsFrom) || new Date(state.now.getTime()-6*86400000);
+  const rangeTo = parseTimestamp(state.insightModalTo || state.statsTo) || state.now;
+  const allLogs = (state.insightModal === "sleep" ? state.insightModalLogs : state.statsLogs).map(normalizeLog).filter((log) => log.date <= state.now);
+  const logs = allLogs.filter((log) => log.date >= rangeFrom && log.date <= rangeTo);
+  const series = buildStatsDailySeriesForRange(logs,rangeFrom,rangeTo);
+  let body = "";
+  if (state.insightModal === "sleep") body = renderExpandedSleepRhythm(allLogs,rangeFrom,rangeTo);
+  if (state.insightModal === "milk") body = renderMilkTrend(series,logs);
+  if (state.insightModal === "rolling") body = renderRollingMilkTrend(buildRollingMilkSeries(allLogs,{from:rangeFrom,to:rangeTo,windowHours:26}),{expanded:true});
+  if (state.insightModal === "diaper") body = renderDiaperTrend(series,logs);
+  return `<div class="modal-backdrop insight-modal-backdrop"><section class="modal-card insight-detail-modal" role="dialog" aria-modal="true" aria-labelledby="insight-detail-title"><div class="modal-header"><div><h2 class="modal-title" id="insight-detail-title">${title}</h2><p class="insight-detail-range">${state.insightModal === "sleep" ? t("sleepRecent30") : statsRangeLabel()}</p></div><button class="close-button" type="button" data-action="close-insight" aria-label="${t("close")}">×</button></div><div class="insight-detail-body insight-${state.insightModal}">${body || `<p class="stats-empty">${t("noRecent")}</p>`}</div></section></div>`;
+}
+
+function renderExpandedSleepRhythm(logs,from,to) {
+  const sessions = buildNightSleepWindows(logs,{from,to,now:state.now}).filter((session) => session.inRange).reverse();
+  if (!sessions.length) return `<div class="night-sleep-empty"><p>${t("sleepNoData")}</p><span>${t("sleepHeuristic")}</span></div>`;
+  return `<p class="expanded-sleep-rule">${t("sleepHeuristic")}</p><div class="expanded-sleep-table"><div class="expanded-sleep-head"><span>日期</span><span>${t("sleepLastFeed")}</span><span>${t("sleepBedtime")}</span><span>${t("sleepWake")}</span><span>${t("sleepDuration")}</span></div>${sessions.map((session) => `<div class="expanded-sleep-row"><b>${formatShortDate(session.wake)}</b><span>${formatClock(session.lastFeedAt)}</span><span>${formatClock(session.bedtime)}</span><span>${formatClock(session.wake)}</span><div><span class="sleep-duration-bar"><i style="width:${Math.max(4,Math.round(session.durationMs/(16*3600000)*100))}%"></i></span><b>${formatCompactDuration(session.durationMs)}</b></div></div>`).join("")}</div>`;
+}
+
 function renderTimelinePage() {
   const rangeButtons = [["today",t("statsToday")],["7",t("stats7")],["30",t("stats30")]];
   if (state.statsLoading && !state.statsLogs.length) {
@@ -629,13 +663,13 @@ function renderTimelinePage() {
     </div>
     <div class="stats-row stats-rhythm-row">
       <article class="stats-card stats-life-card"><h3>${t("lifeTimeline")}</h3>${renderLifeSwimlane(logs)}</article>
-      <article class="stats-card stats-sleep-card"><h3>${t("sleepRhythm")}</h3>${renderNightSleepRhythm(sleepDisplay)}</article>
+      <article class="stats-card stats-sleep-card">${renderStatsCardHeading(t("sleepRhythm"),"sleep")}${renderNightSleepRhythm(sleepDisplay)}</article>
       <article class="stats-card stats-summary-card"><h3>${t("summaryToday")}</h3><div class="stats-summary-body">${renderStatsInsights(todayRow,baseline,latestTemperature)}${renderTodayComparison(todayRow,baseline,comparisonDays)}</div></article>
     </div>
     <div class="stats-row stats-chart-row">
-      <article class="stats-card"><h3>${t("milkTrend")}</h3>${renderMilkTrend(series,logs)}</article>
-      <article class="stats-card"><h3>${t("rollingMilkTrend")}</h3>${renderRollingMilkTrend(rollingMilk)}</article>
-      <article class="stats-card"><h3>${t("diaperTrend")}</h3>${renderDiaperTrend(series,logs)}</article>
+      <article class="stats-card">${renderStatsCardHeading(t("milkTrend"),"milk")}${renderMilkTrend(series,logs)}</article>
+      <article class="stats-card">${renderStatsCardHeading(t("rollingMilkTrend"),"rolling")}${renderRollingMilkTrend(rollingMilk)}</article>
+      <article class="stats-card">${renderStatsCardHeading(t("diaperTrend"),"diaper")}${renderDiaperTrend(series,logs)}</article>
     </div>
     <div class="stats-row stats-detail-row">
       <article class="stats-card"><h3>${t("feedDistribution")}</h3>${renderFeedDistribution(logs)}</article>
@@ -650,6 +684,10 @@ function renderStatsRangeControls(buttons) {
   return `<div class="stats-range-control" aria-label="${t("dateRange")}">${buttons.map(([value,label]) => `<button type="button" data-action="stats-range" data-range="${value}" class="${state.statsRangeMode === value ? "is-selected" : ""}" ${disabled}>${label}</button>`).join("")}<button type="button" data-action="open-custom-range" class="${state.statsRangeMode === "custom" ? "is-selected" : ""}" ${disabled}>${t("statsCustom")}</button></div>`;
 }
 
+function renderStatsCardHeading(title, insight) {
+  return `<div class="stats-card-heading"><h3>${title}</h3><button class="expand-insight-button" type="button" data-action="open-insight" data-insight="${insight}" aria-label="${t("expand")} ${title}">${t("expand")}</button></div>`;
+}
+
 function renderStatsKpi(icon,label,value,comparison,tone) {
   return `<article class="stats-kpi">${iconHtml(icon)}<div><span class="stats-kpi-label">${label}</span><strong>${value}</strong><p class="${tone}">${comparison}</p></div></article>`;
 }
@@ -657,6 +695,10 @@ function renderStatsKpi(icon,label,value,comparison,tone) {
 function buildStatsDailySeries(logs) {
   const from = parseTimestamp(state.statsFrom) || new Date(state.now.getTime()-6*86400000);
   const to = parseTimestamp(state.statsTo) || state.now;
+  return buildStatsDailySeriesForRange(logs,from,to);
+}
+
+function buildStatsDailySeriesForRange(logs,from,to) {
   const first = startOfHongKongDay(from);
   const last = startOfHongKongDay(to);
   const rows = [];
@@ -758,15 +800,17 @@ function renderMilkBars(series,max) {
   return `<div class="daily-chart milk-chart" style="--days:${Math.max(1,series.length)}">${series.map((row,index) => { const showLabel=series.length<=10 || index===0 || index===series.length-1 || index%5===0; return `<div class="daily-bar-column"><div class="daily-bar-metrics"><span class="daily-bar-value">${row.milk || ""}</span>${row.feeds ? `<span class="feed-count-badge">${row.feeds}${t("feedsShort")}</span>` : ""}</div><span class="daily-bar milk" style="height:${Math.max(row.milk ? 8 : 2,Math.round(row.milk/max*72))}%"></span><span class="daily-bar-label">${showLabel ? formatShortDate(row.date) : ""}</span></div>`; }).join("")}</div>`;
 }
 
-function renderRollingMilkTrend(points) {
+function renderRollingMilkTrend(points,{expanded=false}={}) {
   if (!points.length) return `<p class="stats-empty">${t("noRecent")}</p>`;
   const max = Math.max(1,...points.map((point) => point.milk));
+  const axisMaximum = Math.max(100,Math.ceil(max/100)*100);
   const average = points.reduce((sum,point) => sum+point.milk,0)/points.length;
-  const width = 340, height = 58;
-  const coordinates = points.map((point,index) => ({...point,x:points.length === 1 ? width/2 : index/(points.length-1)*width,y:height-(point.milk/max*height)}));
+  const width = 340, height = expanded ? 178 : 58, axisWidth = expanded ? 38 : 28, chartWidth = width-axisWidth;
+  const coordinates = points.map((point,index) => ({...point,x:points.length === 1 ? axisWidth+chartWidth/2 : axisWidth+index/(points.length-1)*chartWidth,y:height-(point.milk/axisMaximum*height)}));
   const latest = points.at(-1);
   const labels = [points[0],points[Math.floor(points.length/2)],latest].filter((point,index,all) => index === 0 || point.date.getTime() !== all[index-1].date.getTime());
-  return `<div class="rolling-chart"><svg viewBox="0 0 ${width} 78" role="img" aria-label="${t("rollingMilkTrend")}"><path d="M0,${height} L${coordinates.map((point) => `${point.x},${point.y}`).join(" L")} L${width},${height} Z" class="rolling-area"/><polyline points="${coordinates.map((point) => `${point.x},${point.y}`).join(" ")}" class="rolling-line"/>${coordinates.filter((_,index) => index === coordinates.length-1 || index % Math.max(1,Math.floor(coordinates.length/5)) === 0).map((point) => `<circle cx="${point.x}" cy="${point.y}" r="2.4"/>`).join("")}</svg><div class="rolling-labels">${labels.map((point) => `<span>${formatShortDate(point.date)} ${formatClock(point.date)}</span>`).join("")}</div></div><div class="chart-foot-stats rolling-foot-stats"><span><b>${latest.milk} ml</b> ${t("rollingCurrent")}</span><span><b>${latest.feeds}</b> ${t("feedsShort")}</span><span class="chart-average">${t("rollingAverage")} ${Math.round(average)} ml</span></div>`;
+  const ticks = [axisMaximum,axisMaximum/2,0];
+  return `<div class="rolling-chart ${expanded ? "is-expanded" : ""}"><svg viewBox="0 0 ${width} ${height+18}" role="img" aria-label="${t("rollingMilkTrend")}">${ticks.map((value) => { const y=height-(value/axisMaximum*height); return `<line x1="${axisWidth}" y1="${y}" x2="${width}" y2="${y}" class="rolling-grid"/><text x="${axisWidth-4}" y="${Math.max(7,y+3)}" class="rolling-y-label">${Math.round(value)}</text>`; }).join("")}<path d="M${axisWidth},${height} L${coordinates.map((point) => `${point.x},${point.y}`).join(" L")} L${width},${height} Z" class="rolling-area"/><polyline points="${coordinates.map((point) => `${point.x},${point.y}`).join(" ")}" class="rolling-line"/>${coordinates.filter((_,index) => index === coordinates.length-1 || index % Math.max(1,Math.floor(coordinates.length/5)) === 0).map((point) => `<circle cx="${point.x}" cy="${point.y}" r="${expanded ? 3 : 2.4}"/>`).join("")}</svg><div class="rolling-labels">${labels.map((point) => `<span>${formatShortDate(point.date)} ${formatClock(point.date)}</span>`).join("")}</div></div><div class="chart-foot-stats rolling-foot-stats"><span><b>${latest.milk} ml</b> ${t("rollingCurrent")}</span><span><b>${latest.feeds}</b> ${t("feedsShort")}</span><span class="chart-average">${t("rollingAverage")} ${Math.round(average)} ml</span></div>`;
 }
 
 function renderDiaperTrend(series,logs) {
@@ -1212,6 +1256,40 @@ function setStatsRange(range) {
   state.statsRangeMode = range;
   const days = range === "today" ? 7 : Number(range);
   loadStatsData(statsRequestForDays(days),range);
+}
+async function openInsight(insight) {
+  if (!['sleep','milk','rolling','diaper'].includes(insight)) return;
+  state.insightModal = insight;
+  state.insightModalLoading = insight === 'sleep';
+  state.insightModalLogs = [];
+  state.insightModalFrom = state.statsFrom;
+  state.insightModalTo = state.statsTo;
+  if (insight !== 'sleep') { render(); return; }
+
+  const request = statsRequestForDays(30);
+  state.insightModalFrom = request.from;
+  state.insightModalTo = request.to;
+  render();
+  try {
+    const statsData = await fetchStatsLogSet(request,'iPad BB App expanded 30-day sleep insight');
+    if (state.insightModal !== 'sleep') return;
+    state.insightModalLogs = statsData.logs;
+  } catch (error) {
+    if (state.insightModal === 'sleep') showNotice(t('connectionFailed'),error.message || t('apiOffline'),'error');
+  } finally {
+    if (state.insightModal === 'sleep') {
+      state.insightModalLoading = false;
+      render();
+    }
+  }
+}
+function closeInsight() {
+  state.insightModal = '';
+  state.insightModalLoading = false;
+  state.insightModalLogs = [];
+  state.insightModalFrom = '';
+  state.insightModalTo = '';
+  render();
 }
 function openStatsCustomRange() {
   const endKey = hongKongDateKey(state.now);

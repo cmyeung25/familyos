@@ -18,9 +18,10 @@ test("derives an overnight sleep proxy around the 04:00 Hong Kong boundary", () 
   });
 
   assert.equal(sessions.length, 1);
-  assert.equal(sessions[0].bedtime.toISOString(), "2026-08-20T19:30:00.000Z");
+  assert.equal(sessions[0].lastFeedAt.toISOString(), "2026-08-20T19:30:00.000Z");
+  assert.equal(sessions[0].bedtime.toISOString(), "2026-08-20T20:30:00.000Z");
   assert.equal(sessions[0].wake.toISOString(), "2026-08-20T23:10:00.000Z");
-  assert.equal(sessions[0].durationMs, 3 * 60 * 60 * 1000 + 40 * 60 * 1000);
+  assert.equal(sessions[0].durationMs, 2 * 60 * 60 * 1000 + 40 * 60 * 1000);
 });
 
 test("calculates rolling 26-hour milk totals independently of midnight", () => {

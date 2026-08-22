@@ -121,7 +121,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Completed`: thin Node proxy that keeps `FAMILY_OS_API_KEY` server-side and uses existing Apps Script API actions
 - `Completed`: fixed-height bilingual iPad dashboard with flat non-distorted icons, temperature / feeding-completion popups, live-following event times, and per-feed diagonal-capsule medicine metadata stored in feeding remarks
 - `Completed`: fixed-height bilingual BB insights dashboard with Today / 7-day / 30-day / custom ranges, personal baseline comparisons, 24-hour swimlanes, and milk / diaper / temperature trends
-- `Completed`: Insights now adds a clearly-labelled night-rhythm estimate from feeding records, stool quantity distribution, daily feed counts, and rolling 26-hour milk totals alongside calendar-day totals
+- `Completed`: Insights now adds expandable charts, a 30-day night-rhythm estimate from feeding records, stool quantity distribution, daily feed counts, and rolling 26-hour milk totals alongside calendar-day totals
 - `Completed`: additive `query_baby_logs` Apps Script action with default 7-day and maximum 30-day ranges plus stable cursor pagination; the legacy recent-log action remains compatible
 - `Completed`: Synology container is bound to NAS loopback port `8791`; the router forwards public port `8790` to the Synology HTTPS reverse proxy on `8792`, serving `https://hbsz.myds.me:8790/` with the trusted auto-renewing Synology DDNS certificate; the hostname's default HTTPS port is not assigned to the BB app
 - `Pending`: physical iPad Add to Home Screen validation and one agreed end-to-end write / `audit_log` check
@@ -226,7 +226,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - recent feeding, diaper, and temperature records support optimistic-concurrency updates and audited soft deletion from a fixed-height popup
   - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
   - Settings uses the PWA health contract to display the current concrete data path, now `MariaDB` through the `BB Data API` for Gary.
-  - Insights preserves calendar-day milk totals and adds a rolling 26-hour milk series. Night rhythm is explicitly a feed-record heuristic: the final feed before 04:00 is estimated bedtime and the first feed after 04:00 is estimated wake time; it is not sleep monitoring.
+  - Insights preserves calendar-day milk totals and adds a rolling 26-hour milk series with Y-axis values. Night rhythm is explicitly a feed-record heuristic: the final feed before 04:00 plus one hour is estimated bedtime and the first feed after 04:00 is estimated wake time; it is not sleep monitoring. Its expanded view always loads the last 30 days.
 
 ### Phase 10: BB MariaDB Data Layer
 
