@@ -20,6 +20,8 @@ The browser never receives `FAMILY_OS_API_KEY`. The server exposes only these wh
 - `update_baby_log`
 - `delete_baby_log`
 
+The Settings page reads `/api/health` and shows the concrete data path implemented by the server. The current path is `Google Sheets (Apps Script API)`; no environment variable can relabel it. A later MariaDB cutover must change the server's actual health contract to `NAS BB Data API` + `MariaDB`.
+
 ## Start Locally
 
 From this folder:

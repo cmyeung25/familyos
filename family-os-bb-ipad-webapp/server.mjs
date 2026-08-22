@@ -9,6 +9,8 @@ const publicDir = join(__dirname, "public");
 const port = Number(process.env.FAMILY_OS_BB_IPAD_PORT || process.env.PORT || 8787);
 const apiUrl = process.env.FAMILY_OS_API_URL || "";
 const apiKey = process.env.FAMILY_OS_API_KEY || "";
+// This is the concrete route implemented by this server, not a user-controlled label.
+const dataPath = Object.freeze({ api: "apps_script", storage: "google_sheets" });
 
 const allowedActions = new Set([
   "health",
@@ -150,7 +152,13 @@ async function handleApi(req, res) {
   try {
     if (req.method === "GET" && req.url === "/api/health") {
       const data = await callFamilyOsApi("health", {}, "iPad BB App health check");
-      sendJson(res, 200, data);
+      sendJson(res, 200, {
+        ...data,
+        result: {
+          ...(data.result || {}),
+          data_path: dataPath,
+        },
+      });
       return;
     }
 

@@ -102,7 +102,8 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Planned`: `household_memory` sheet and API actions
 - `Planned`: additive schema governance for future memory extensions
 - `In progress`: BB Google Calendar integration through narrow Apps Script actions with linked task rows
-- `Deferred`: non-Sheets primary database
+- `Planned`: BB iPad-only MariaDB migration draft. It uses `baby_events` plus typed feeding, diaper, and temperature tables, BB audit history, and BB statistics; Dobby tasks, household memory, inventory, and Google Calendar remain on Google Sheets / Apps Script.
+- `Deferred`: non-Sheets primary database for the rest of Family OS
 
 ### Lane C: Conversation UX
 
@@ -223,6 +224,26 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the Apps Script API actions `health`, `get_recent_baby_logs`, `query_baby_logs`, `append_baby_log`, `update_baby_log`, and `delete_baby_log`
   - recent feeding, diaper, and temperature records support optimistic-concurrency updates and audited soft deletion from a fixed-height popup
   - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
+  - Settings uses the PWA health contract to display the current concrete data path: `Google Sheets` through `Apps Script API`.
+
+### Phase 10: BB MariaDB Data Layer
+
+- `In progress`
+- Goal:
+  - move only the Gary BB iPad log path from Google Sheets to MariaDB
+  - make longer-range BB statistics and standard CRUD reliable without changing Dobby's data path
+- Initial scope:
+  - `baby_profiles`, `baby_events`, typed feeding / diaper / temperature detail tables, and `baby_event_audit`
+  - a NAS-only BB Data API with typed create and update actions; current generic iPad action names are temporary compatibility adapters only
+  - one-time historical import from the Sheets `baby_log` tab
+  - per-tenant database `familyos_gary_bb`
+- Explicit non-goals:
+  - no Dobby read/write access to current BB logs during the first cutover
+  - no task, inventory, household memory, or Google Calendar migration
+  - no Brother BB database
+- Current implementation note:
+  - Synology MariaDB 10.11 now has the Gary-only `familyos_gary_bb` schema and restricted `familyos_gary_bb_app` accounts for `localhost` and Docker `172.*` networks.
+  - No historical data, BB Data API, iPad runtime, or Dobby BB-log cutover has been performed.
 
 ## Immediate Next Milestones
 

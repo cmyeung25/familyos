@@ -27,7 +27,7 @@ const I18N = {
     drinkDuration: "飲用時間", confirmActual: "確認實際飲奶量", fullFeed: "全飲", noMilk: "無飲", gaveMedicine: "餵藥", confirmFeed: "確認飲奶紀錄",
     recentLogs: "最近記錄", viewAll: "查看全部 ›", noRecent: "未有最近 BB 紀錄", diaperRecord: "換片記錄", feedingRecord: "飲奶記錄", temperatureRecord: "體溫記錄",
     actualMilk: "實際奶量", feeds: "{count} 次餵奶", preparedMilk: "沖奶量", leftover: "剩餘", past26: "過去 26 小時", average: "平均每次", sinceLastFeed: "距離上次餵奶", lastFeedHeader: "上次餵奶", noFeedYet: "未有餵奶記錄", timeline26: "26 小時時間軸",
-    all: "全部", feeding: "飲奶", diaper: "換片", refresh: "刷新", showing: "顯示最新 {count} 筆", sheetsApi: "Google Sheets 經 Apps Script API 寫入", localCache: "本機快取", records: "{count} 筆", clearTimer: "清除沖奶計時",
+    all: "全部", feeding: "飲奶", diaper: "換片", refresh: "刷新", showing: "顯示最新 {count} 筆", dataPathDescription: "目前實際讀寫路徑", dataSource: "資料來源", dataSourceAppsScriptSheets: "Google Sheets（Apps Script API）", dataSourceMariaDb: "MariaDB（NAS BB Data API）", dataSourceUnknown: "未能確認", localCache: "本機快取", records: "{count} 筆", clearTimer: "清除沖奶計時",
     submitWait: "記錄中，請勿關閉或切換頁面", submitFailed: "未能提交紀錄", retry: "返回再試", gotIt: "知道了", today: "今日", yesterday: "昨日", currentLabel: "現在",
     justNow: "剛剛", minutesAgo: "{minutes} 分鐘前", hoursMinutesAgo: "{hours} 小時 {minutes} 分鐘前", hoursAgo: "{hours} 小時前", minutesDuration: "{minutes} 分鐘", hoursMinutesDuration: "{hours} 小時 {minutes} 分鐘", hoursDuration: "{hours} 小時",
     refreshed: "已刷新紀錄", refreshedDetail: "{count} 筆 BB 紀錄", connectionFailed: "未能連接", apiOffline: "Family OS API 暫時離線",
@@ -59,7 +59,7 @@ const I18N = {
     drinkDuration: "Elapsed", confirmActual: "Confirm actual milk intake", fullFeed: "All", noMilk: "None", gaveMedicine: "Medicine given", confirmFeed: "Confirm feeding log",
     recentLogs: "Recent logs", viewAll: "View all ›", noRecent: "No recent baby logs", diaperRecord: "Diaper log", feedingRecord: "Feeding log", temperatureRecord: "Temperature log",
     actualMilk: "Actual milk", feeds: "{count} feeds", preparedMilk: "Prepared", leftover: "Left", past26: "Past 26 hours", average: "Average feed", sinceLastFeed: "Since last feed", lastFeedHeader: "Last feed", noFeedYet: "No feeding record", timeline26: "26-hour timeline",
-    all: "All", feeding: "Feeding", diaper: "Diaper", refresh: "Refresh", showing: "Showing latest {count}", sheetsApi: "Writes to Google Sheets through Apps Script API", localCache: "Local cache", records: "{count} records", clearTimer: "Clear milk timer",
+    all: "All", feeding: "Feeding", diaper: "Diaper", refresh: "Refresh", showing: "Showing latest {count}", dataPathDescription: "Current verified read/write path", dataSource: "Data source", dataSourceAppsScriptSheets: "Google Sheets (Apps Script API)", dataSourceMariaDb: "MariaDB (NAS BB Data API)", dataSourceUnknown: "Not confirmed", localCache: "Local cache", records: "{count} records", clearTimer: "Clear milk timer",
     submitWait: "Saving. Do not close or switch pages.", submitFailed: "Could not save", retry: "Back and retry", gotIt: "Done", today: "Today", yesterday: "Yesterday", currentLabel: "Now",
     justNow: "Just now", minutesAgo: "{minutes} min ago", hoursMinutesAgo: "{hours} hr {minutes} min ago", hoursAgo: "{hours} hr ago", minutesDuration: "{minutes} min", hoursMinutesDuration: "{hours} hr {minutes} min", hoursDuration: "{hours} hr",
     refreshed: "Logs refreshed", refreshedDetail: "{count} baby logs", connectionFailed: "Connection failed", apiOffline: "Family OS API is offline",
@@ -95,6 +95,7 @@ const state = {
   statsCustomFrom: "",
   statsCustomTo: "",
   apiStatus: { ok: null, text: "", textKey: "checking" },
+  dataPath: null,
   logs: readJson(STORAGE_KEYS.logs, []),
   saving: "",
   notice: null,
@@ -770,13 +771,21 @@ function renderStatsRecentItem(log) {
 function renderSettingsPage() {
   const bottle = currentBottle();
   const statusText = state.apiStatus.textKey ? t(state.apiStatus.textKey) : state.apiStatus.text;
-  return `<div class="settings-page"><section class="card card-pad"><div class="card-header"><div class="card-title">${iconHtml("settings",true)}<div><h2>${t("settings")}</h2><p class="meta">${t("sheetsApi")}</p></div></div><button class="secondary-button" data-action="refresh">${t("refresh")}</button></div><div class="settings-grid"><div class="stat-cell"><span class="label">API</span><span class="status-badge ${state.apiStatus.ok ? "ok" : "error"}">${escapeHtml(statusText)}</span></div><div class="stat-cell"><span class="label">${t("localCache")}</span><span class="value">${t("records", {count: state.logs.length})}</span></div><div class="stat-cell"><span class="label">${t("milkTimer")}</span><span class="value">${bottle ? `${bottle.preparedMl} ml` : "--"}</span></div></div><div class="filter-row" style="margin-top:14px"><button class="secondary-button" data-action="clear-bottle">${t("clearTimer")}</button></div></section></div>`;
+  const statusClass = state.apiStatus.ok === true ? "ok" : state.apiStatus.ok === false ? "error" : "pending";
+  return `<div class="settings-page"><section class="card card-pad"><div class="card-header"><div class="card-title">${iconHtml("settings",true)}<div><h2>${t("settings")}</h2><p class="meta">${t("dataPathDescription")}</p></div></div><button class="secondary-button" data-action="refresh">${t("refresh")}</button></div><div class="settings-grid"><div class="stat-cell"><span class="label">${t("dataSource")}</span><span class="value data-source-value">${escapeHtml(dataSourceLabel(state.dataPath))}</span></div><div class="stat-cell"><span class="label">API</span><span class="status-badge ${statusClass}">${escapeHtml(statusText)}</span></div><div class="stat-cell"><span class="label">${t("localCache")}</span><span class="value">${t("records", {count: state.logs.length})}</span></div><div class="stat-cell"><span class="label">${t("milkTimer")}</span><span class="value">${bottle ? `${bottle.preparedMl} ml` : "--"}</span></div></div><div class="filter-row" style="margin-top:14px"><button class="secondary-button" data-action="clear-bottle">${t("clearTimer")}</button></div></section></div>`;
+}
+
+function dataSourceLabel(path) {
+  if (path?.api === "apps_script" && path?.storage === "google_sheets") return t("dataSourceAppsScriptSheets");
+  if (path?.api === "bb_data_api" && path?.storage === "mariadb") return t("dataSourceMariaDb");
+  return t("dataSourceUnknown");
 }
 
 async function refreshData(reason) {
   try {
     const health = await getHealth();
     state.apiStatus = { ok:true, text:`${health.household_id || "hh_home"} · ${health.schema_version || "schema ok"}`, textKey:"" };
+    state.dataPath = health.data_path || null;
     const request = statsRequestForDays(7);
     const logs = await fetchBabyLogPages(request,"iPad BB App 7-day refresh");
     state.logs = logs;
@@ -790,6 +799,7 @@ async function refreshData(reason) {
     if (reason === "manual") showNotice(t("refreshed"),t("refreshedDetail", {count: state.logs.length}),"success");
   } catch (error) {
     state.apiStatus = {ok:false,text:"API offline",textKey:""};
+    state.dataPath = null;
     if (reason !== "load" || !state.logs.length) showNotice(t("connectionFailed"),error.message || t("apiOffline"),"error");
   } finally { render(); }
 }
