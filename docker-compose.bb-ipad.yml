@@ -6,7 +6,7 @@ services:
     image: familyos:bb-ipad
     env_file:
       - ./instances/gary/secrets/bb-ipad.env
-      - ./instances/gary/secrets/bb-data-api-client.env
+      - ../instances/gary/secrets/bb-data-api-client.env
     environment:
       FAMILY_OS_BB_IPAD_PORT: 8790
       NODE_ENV: production
@@ -30,8 +30,8 @@ services:
       dockerfile: Dockerfile
     image: familyos:bb-data-api
     env_file:
-      - ./instances/gary/secrets/bb-mariadb.env
-      - ./instances/gary/secrets/bb-data-api.env
+      - ../instances/gary/secrets/bb-mariadb.env
+      - ../instances/gary/secrets/bb-data-api.env
     environment:
       FAMILY_OS_BB_DATA_API_PORT: 8788
       NODE_ENV: production

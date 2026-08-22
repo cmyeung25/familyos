@@ -4,8 +4,8 @@ set -eu
 DOCKER_BIN="${DOCKER_BIN:-/usr/local/bin/docker}"
 REPO_ROOT="${REPO_ROOT:-/volume1/docker/familyos/repo}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.bb-ipad.yml}"
-DB_ENV="${DB_ENV:-instances/gary/secrets/bb-mariadb.env}"
-API_ENV="${API_ENV:-instances/gary/secrets/bb-data-api.env}"
+DB_ENV="${DB_ENV:-../instances/gary/secrets/bb-mariadb.env}"
+API_ENV="${API_ENV:-../instances/gary/secrets/bb-data-api.env}"
 
 run_docker() {
   if [ "$(id -u)" -eq 0 ]; then "$DOCKER_BIN" "$@"; else sudo "$DOCKER_BIN" "$@"; fi

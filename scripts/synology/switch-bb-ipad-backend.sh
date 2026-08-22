@@ -4,8 +4,8 @@ set -eu
 DOCKER_BIN="${DOCKER_BIN:-/usr/local/bin/docker}"
 REPO_ROOT="${REPO_ROOT:-/volume1/docker/familyos/repo}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.bb-ipad.yml}"
-API_ENV="${API_ENV:-instances/gary/secrets/bb-data-api.env}"
-CLIENT_ENV="${CLIENT_ENV:-instances/gary/secrets/bb-data-api-client.env}"
+API_ENV="${API_ENV:-../instances/gary/secrets/bb-data-api.env}"
+CLIENT_ENV="${CLIENT_ENV:-../instances/gary/secrets/bb-data-api-client.env}"
 TARGET="${1:-}"
 
 run_docker() {

@@ -6,7 +6,7 @@ REPO_ROOT="${REPO_ROOT:-/volume1/docker/familyos/repo}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.bb-ipad.yml}"
 SOURCE_ENV="${SOURCE_ENV:-instances/gary/.env}"
 WEBAPP_ENV="${WEBAPP_ENV:-instances/gary/secrets/bb-ipad.env}"
-CLIENT_ENV="${CLIENT_ENV:-instances/gary/secrets/bb-data-api-client.env}"
+CLIENT_ENV="${CLIENT_ENV:-../instances/gary/secrets/bb-data-api-client.env}"
 
 run_docker() {
   if [ "$(id -u)" -eq 0 ]; then
