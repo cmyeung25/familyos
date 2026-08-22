@@ -27,6 +27,11 @@ function nextWindowStart(end) {
   return new Date(end.getTime() + 1);
 }
 
+function toSourceTimestamp(value) {
+  // Apps Script accepts second precision only, while the MariaDB mapper keeps milliseconds.
+  return toHongKongTimestamp(value).replace(/\.\d{3}(?=\+08:00$)/, "");
+}
+
 const report = {
   source: "google_sheets_baby_log",
   migration_from: config.migrationFrom,
@@ -46,8 +51,8 @@ try {
     let cursor = "";
     do {
       const page = await callSource({
-        from: toHongKongTimestamp(windowStart),
-        to: toHongKongTimestamp(windowEnd),
+        from: toSourceTimestamp(windowStart),
+        to: toSourceTimestamp(windowEnd),
         limit: 200,
         cursor,
       });

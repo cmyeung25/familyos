@@ -43,9 +43,9 @@ The system is currently aimed at:
   - `docker/healthcheck.mjs`
   - `docker/health_server.mjs`
   - `docker-compose.monitoring.example.yml`
-- Google Sheets remains the live source of truth.
-- Apps Script is the current audited API layer.
-- A first iPad BB PWA implementation exists under `family-os-bb-ipad-webapp/`, using a thin Node proxy to the Apps Script API while keeping Google Sheets as the source of truth.
+- Google Sheets and Apps Script remain the live source of truth for Dobby, inventory, tasks, household memory, and Google Calendar workflows.
+- Gary's iPad BB log path uses the NAS-internal BB Data API and MariaDB; its historical Sheets records remain preserved as the legacy source archive.
+- A first iPad BB PWA implementation exists under `family-os-bb-ipad-webapp/`, using a thin Node proxy with a selectable Apps Script or NAS-internal BB Data API backend.
 - Telegram bot persona can now be loaded per instance from `config/persona.yaml`.
 - Brother instance is intentionally narrower than Gary:
   - inventory
@@ -102,7 +102,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
 - `Planned`: `household_memory` sheet and API actions
 - `Planned`: additive schema governance for future memory extensions
 - `In progress`: BB Google Calendar integration through narrow Apps Script actions with linked task rows
-- `Planned`: BB iPad-only MariaDB migration draft. It uses `baby_events` plus typed feeding, diaper, and temperature tables, BB audit history, and BB statistics; Dobby tasks, household memory, inventory, and Google Calendar remain on Google Sheets / Apps Script.
+- `Completed`: BB iPad-only MariaDB cutover with typed feeding, diaper, and temperature tables, BB audit history, and a NAS-internal API; Dobby tasks, household memory, inventory, and Google Calendar remain on Google Sheets / Apps Script.
 - `Deferred`: non-Sheets primary database for the rest of Family OS
 
 ### Lane C: Conversation UX
@@ -224,11 +224,11 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - `family-os-bb-ipad-webapp/` serves a static PWA and proxies the Apps Script API actions `health`, `get_recent_baby_logs`, `query_baby_logs`, `append_baby_log`, `update_baby_log`, and `delete_baby_log`
   - recent feeding, diaper, and temperature records support optimistic-concurrency updates and audited soft deletion from a fixed-height popup
   - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
-  - Settings uses the PWA health contract to display the current concrete data path: `Google Sheets` through `Apps Script API`.
+  - Settings uses the PWA health contract to display the current concrete data path, now `MariaDB` through the `BB Data API` for Gary.
 
 ### Phase 10: BB MariaDB Data Layer
 
-- `In progress`
+- `Completed`
 - Goal:
   - move only the Gary BB iPad log path from Google Sheets to MariaDB
   - make longer-range BB statistics and standard CRUD reliable without changing Dobby's data path
@@ -243,7 +243,8 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - no Brother BB database
 - Current implementation note:
   - Synology MariaDB 10.11 now has the Gary-only `familyos_gary_bb` schema and restricted `familyos_gary_bb_app` accounts for `localhost` and Docker `172.*` networks.
-  - A NAS-internal BB Data API and idempotent Apps Script-to-MariaDB migration job are implemented for typed feeding, diaper, and temperature records; deployment and live migration remain pending.
+  - A NAS-internal BB Data API is running without an externally published port, and the iPad PWA uses it as the MariaDB backend.
+  - The idempotent Apps Script-to-MariaDB job imported 672 active typed records: 319 feeding, 337 diaper, and 16 temperature. It left 19 unsupported legacy records in Google Sheets without alteration: 2 clinic visits, 1 doctor visit, 2 vaccinations, and 14 symptoms.
   - Dobby has no MariaDB BB-log access. Non-iPad legacy types such as vaccination and clinic visit remain in Google Sheets during this phase.
 
 ## Immediate Next Milestones

@@ -20,7 +20,7 @@ FAMILY_OS_API_URL="$(sed -n 's/^FAMILY_OS_API_URL=//p' "$SOURCE_ENV" | head -n 1
 FAMILY_OS_API_KEY="$(sed -n 's/^FAMILY_OS_API_KEY=//p' "$SOURCE_ENV" | head -n 1)"
 export FAMILY_OS_API_URL FAMILY_OS_API_KEY
 echo "Running idempotent Google Sheets BB migration. Google Sheets remains read-only."
-run_docker compose -f "$COMPOSE_FILE" run --rm \
+run_docker compose -f "$COMPOSE_FILE" run --rm -T \
   -e FAMILY_OS_API_URL \
   -e FAMILY_OS_API_KEY \
   familyos-bb-data-api node migrate.mjs
