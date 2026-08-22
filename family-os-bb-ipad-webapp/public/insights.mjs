@@ -45,7 +45,7 @@ export function buildNightSleepWindows(logs, { from, to, now = new Date() } = {}
   const sessions = [];
 
   for (let day = firstDay.getTime(); day <= lastDay.getTime(); day += 24 * HOUR_MS) {
-    const boundary = new Date(day + 3 * HOUR_MS);
+    const boundary = new Date(day + 4 * HOUR_MS);
     const bedtime = feeds.filter((feed) => feed.date < boundary && feed.date >= new Date(boundary.getTime() - 18 * HOUR_MS)).at(-1);
     const wake = feeds.find((feed) => feed.date >= boundary && feed.date <= current && feed.date <= new Date(boundary.getTime() + 15 * HOUR_MS));
     if (!bedtime || !wake) continue;

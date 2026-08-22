@@ -226,7 +226,7 @@ Per-instance secrets, persona, logs, state, auth cache, runtime knowledge
   - recent feeding, diaper, and temperature records support optimistic-concurrency updates and audited soft deletion from a fixed-height popup
   - the workbook schema is unchanged; active bottle preparation state remains local until the feed is completed
   - Settings uses the PWA health contract to display the current concrete data path, now `MariaDB` through the `BB Data API` for Gary.
-  - Insights preserves calendar-day milk totals and adds a rolling 26-hour milk series. Night rhythm is explicitly a feed-record heuristic: the final feed before 03:00 is estimated bedtime and the first feed after 03:00 is estimated wake time; it is not sleep monitoring.
+  - Insights preserves calendar-day milk totals and adds a rolling 26-hour milk series. Night rhythm is explicitly a feed-record heuristic: the final feed before 04:00 is estimated bedtime and the first feed after 04:00 is estimated wake time; it is not sleep monitoring.
 
 ### Phase 10: BB MariaDB Data Layer
 
