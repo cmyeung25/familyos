@@ -427,6 +427,7 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
 .tab-button .app-icon { height: 24px; width: 24px; }.tab-button.is-active { color: var(--indigo); }
 
 .ipad-landscape-hint { display: none; }
+.is-iphone .ipad-landscape-hint { display: none !important; }
 
 /* iPad mini portrait starts at 744x1133 CSS px. The height guard keeps this
    guidance out of every iPhone portrait viewport, including large models. */

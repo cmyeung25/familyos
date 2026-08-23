@@ -1,4 +1,4 @@
-const CACHE_NAME = "family-os-bb-ipad-v20";
+const CACHE_NAME = "family-os-bb-ipad-v21";
 const APP_SHELL = [
   "/",
   "/index.html",
