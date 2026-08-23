@@ -426,6 +426,27 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
 .tab-button { align-items: center; background: transparent; color: var(--muted); display: flex; font-size: 11px; font-weight: 680; gap: 8px; justify-content: center; }
 .tab-button .app-icon { height: 24px; width: 24px; }.tab-button.is-active { color: var(--indigo); }
 
+.ipad-landscape-hint { display: none; }
+
+@media (min-width: 701px) and (orientation: portrait) {
+  .ipad-landscape-hint {
+    align-items: center;
+    background: rgba(255, 247, 250, .97);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    inset: 0;
+    justify-content: center;
+    padding: 28px;
+    position: fixed;
+    text-align: center;
+    z-index: 100;
+  }
+  .ipad-landscape-hint-icon { color: var(--indigo); font-size: 54px; font-weight: 800; line-height: 1; }
+  .ipad-landscape-hint strong { font-size: 22px; }
+  .ipad-landscape-hint span:last-child { color: var(--muted); font-size: 14px; }
+}
+
 /* Full iPhone portrait renderer. The same cards and actions are retained, but
    the dashboard becomes a deliberate vertical sequence with a sticky nav. */
 @media (max-width: 700px) and (orientation: portrait) {
