@@ -428,7 +428,9 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
 
 .ipad-landscape-hint { display: none; }
 
-@media (min-width: 701px) and (orientation: portrait) {
+/* iPad mini portrait starts at 744x1133 CSS px. The height guard keeps this
+   guidance out of every iPhone portrait viewport, including large models. */
+@media (min-width: 701px) and (min-height: 960px) and (orientation: portrait) {
   .ipad-landscape-hint {
     align-items: center;
     background: rgba(255, 247, 250, .97);
