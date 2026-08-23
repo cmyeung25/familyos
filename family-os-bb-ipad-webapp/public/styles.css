@@ -426,6 +426,44 @@ h1 { font-size: 20px; font-weight: 780; line-height: 1; }
 .tab-button { align-items: center; background: transparent; color: var(--muted); display: flex; font-size: 11px; font-weight: 680; gap: 8px; justify-content: center; }
 .tab-button .app-icon { height: 24px; width: 24px; }.tab-button.is-active { color: var(--indigo); }
 
+/* Full iPhone portrait renderer. The same cards and actions are retained, but
+   the dashboard becomes a deliberate vertical sequence with a sticky nav. */
+@media (max-width: 700px) and (orientation: portrait) {
+  body { overflow: auto; }
+  .app-shell {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(76px + var(--safe-bottom)) calc(12px + var(--safe-left));
+  }
+  .topbar { align-items: center; display: grid; grid-template-columns: 1fr auto; min-height: 56px; }
+  .brand-block { gap: 9px; }.baby-avatar { height: 42px; width: 42px; }.baby-avatar span { height: 37px; width: 37px; }
+  h1 { font-size: 18px; }.header-date { font-size: 10px; margin-top: 3px; }
+  .header-focus { display: none; }.header-controls { gap: 6px; }.language-button { height: 34px; min-width: 40px; }
+  .app-main { min-height: auto; overflow: visible; }
+  .panel-grid { display: flex; flex-direction: column; gap: 10px; height: auto; }
+  .column-panel { border-radius: 14px; gap: 9px; padding: 9px; }
+  .panel-heading { padding-inline: 3px; }
+  .diaper-card, .bottle-card, .now-card, .overview-card.today, .overview-card.rolling, .overview-card.rhythm { flex: none; }
+  .diaper-card { min-height: 250px; }.bottle-card { min-height: 225px; }.now-card { min-height: 250px; }
+  .temperature-card { min-height: 64px; }.recent-card { min-height: 260px; }
+  .recent-list { max-height: 330px; overflow: auto; }.recent-item { grid-template-columns: 29px 54px minmax(0,1fr) 48px; }
+  .step-row { gap: 5px; }.step-button { font-size: 10px; min-height: 32px; }
+  .choice-button { min-height: 46px; }.choice-button .amount-icon { transform: scale(.9); }
+  .primary-button, .outline-button { min-height: 44px; font-size: 15px; }
+  .bottom-nav {
+    bottom: calc(8px + var(--safe-bottom)); left: calc(10px + var(--safe-left)); position: fixed; right: calc(10px + var(--safe-right));
+    width: auto; z-index: 30;
+  }
+  .tab-button { min-height: 52px; font-size: 11px; flex-direction: column; gap: 1px; }
+  .tab-button .app-icon { height: 21px; width: 21px; }
+  .timeline-page { padding-bottom: 2px; }.stats-dashboard { gap: 10px; }
+  .stats-toolbar { align-items: flex-start; flex-direction: column; gap: 10px; }.stats-range-controls { width: 100%; }
+  .stats-kpi-grid, .stats-row { grid-template-columns: 1fr; }.stats-card { min-height: 0; }
+  .modal-backdrop, .submit-backdrop { align-items: flex-end; padding: 10px; }
+  .modal-card, .submit-card { border-radius: 18px 18px 12px 12px; max-height: calc(100dvh - 20px); overflow: auto; width: 100%; }
+}
+
 .modal-backdrop,
 .submit-backdrop {
   align-items: center;

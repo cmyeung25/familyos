@@ -1,7 +1,11 @@
 import { buildNightSleepWindows, buildRollingMilkSeries, summarizePooIntensity } from "./insights.mjs";
+import { activeFeedingApi, callBbAction, getBbHealth } from "./bb-api.mjs";
 
 const HK_TZ = "Asia/Hong_Kong";
 const RECENT_RECORD_RESUME_GUARD_MS = 1500;
+// Keep the existing local timer path live until the active-feeding API migration
+// is rolled out on NAS. The portrait renderer can ship independently.
+const SHARED_ACTIVE_FEEDING_ENABLED = false;
 const STORAGE_KEYS = {
   activeBottle: "family-os-bb-ipad:active-bottle",
   language: "family-os-bb-ipad:language",
@@ -123,6 +127,8 @@ const state = {
   preparedMl: 120,
   medicineGiven: false,
   temperature: 36.8,
+  // The server session is the source of truth; local storage is only an
+  // offline display fallback while the app reconnects.
   activeBottle: readJson(STORAGE_KEYS.activeBottle, null),
 };
 
@@ -860,6 +866,11 @@ async function refreshData(reason) {
     const health = await getHealth();
     state.apiStatus = { ok:true, text:`${health.household_id || "hh_home"} · ${health.schema_version || "schema ok"}`, textKey:"" };
     state.dataPath = health.data_path || null;
+    if (SHARED_ACTIVE_FEEDING_ENABLED) {
+      const activeFeeding = await activeFeedingApi.get();
+      state.activeBottle = activeFeeding ? activeSessionToBottle(activeFeeding) : null;
+      persistActiveBottle();
+    }
     const request = statsRequestForDays(7);
     const statsData = await fetchStatsLogSet(request,"iPad BB App 7-day refresh");
     state.logs = statsData.displayLogs;
@@ -944,17 +955,11 @@ async function loadStatsData(request,key) {
 }
 
 async function getHealth() {
-  const response = await fetch("/api/health",{cache:"no-store"});
-  const data = await response.json();
-  if (!response.ok || data.ok !== true) throw new Error(data.error || "Health check failed");
-  return data.result || {};
+  return getBbHealth();
 }
 
 async function callApi(action,payload,requestText) {
-  const response = await fetch("/api/family-os",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action,payload,request_text:requestText})});
-  const data = await response.json();
-  if (!response.ok || data.ok !== true) throw new Error(data.error || "Family OS API request failed");
-  return data.result;
+  return callBbAction(action,payload,requestText);
 }
 
 async function runSave(key,requestText,payload,afterSave,display) {
@@ -989,22 +994,53 @@ function saveDiaper() {
   runSave("diaper",`iPad BB App 換片: ${readable}`,payload,() => { resetTimeFollowing("diaper"); state.diaper = {pee:"medium",poo:"none"}; },{icon:"diaper",savingTitle:t("diaperSaving"),successTitle:t("diaperSuccess"),detail:t("diaperDetail", {time, pee:t(pee), poo:t(poo)})});
 }
 
-function startBottle() {
+async function startBottle() {
+  if (state.saving) return;
   const preparedAt = new Date(effectiveTime("bottle"));
-  const bottle = {id:`local_${preparedAt.getTime()}`,preparedMl:state.preparedMl,medicineGiven:state.medicineGiven,preparedAt:preparedAt.toISOString(),expiresAt:new Date(preparedAt.getTime()+3600000).toISOString()};
-  state.activeBottle = bottle; state.finishOpen = false; state.actualMl = bottle.preparedMl;
-  localStorage.setItem(STORAGE_KEYS.activeBottle,JSON.stringify(bottle));
-  showNotice(t("milkTimerStarted"),t("startedDetail", {ml:bottle.preparedMl,time:formatClock(preparedAt),medicine:bottle.medicineGiven ? t("medicineSuffix") : ""}),"success");
-  resetTimeFollowing("bottle"); state.medicineGiven = false; render();
+  if (!SHARED_ACTIVE_FEEDING_ENABLED) {
+    const bottle = {id:`local_${preparedAt.getTime()}`,preparedMl:state.preparedMl,medicineGiven:state.medicineGiven,preparedAt:preparedAt.toISOString(),expiresAt:new Date(preparedAt.getTime()+3600000).toISOString()};
+    state.activeBottle = bottle; state.finishOpen = false; state.actualMl = bottle.preparedMl;
+    persistActiveBottle();
+    showNotice(t("milkTimerStarted"),t("startedDetail", {ml:bottle.preparedMl,time:formatClock(preparedAt),medicine:bottle.medicineGiven ? t("medicineSuffix") : ""}),"success");
+    resetTimeFollowing("bottle"); state.medicineGiven = false; render();
+    return;
+  }
+  state.saving = "active-feeding"; render();
+  try {
+    const session = await activeFeedingApi.start({
+      prepared_ml: state.preparedMl, prepared_at: toHongKongTimestamp(preparedAt), medicine_given: state.medicineGiven,
+      client_request_id: typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : "",
+    });
+    const bottle = activeSessionToBottle(session);
+    state.activeBottle = bottle; state.finishOpen = false; state.actualMl = bottle.preparedMl;
+    persistActiveBottle();
+    showNotice(t("milkTimerStarted"),t("startedDetail", {ml:bottle.preparedMl,time:formatClock(preparedAt),medicine:bottle.medicineGiven ? t("medicineSuffix") : ""}),"success");
+    resetTimeFollowing("bottle"); state.medicineGiven = false;
+  } catch (error) {
+    showNotice(t("connectionFailed"),error.message || t("apiOffline"),"error");
+  } finally { state.saving = ""; render(); }
 }
 
-function saveFeeding() {
+async function saveFeeding() {
   const bottle = currentBottle(); if (!bottle) return;
-  const finishedAt = new Date();
-  const remarks = ["Recorded through iPad BB App",`prepared_ml=${bottle.preparedMl}`,`actual_ml=${state.actualMl}`,`medicine_given=${bottle.medicineGiven ? "true" : "false"}`,`prepared_at=${toHongKongTimestamp(bottle.preparedAt)}`,`expires_at=${toHongKongTimestamp(bottle.expiresAt)}`].join("; ");
-  const payload = {event_at:toHongKongTimestamp(bottle.preparedAt),started_at:toHongKongTimestamp(bottle.preparedAt),ended_at:toHongKongTimestamp(finishedAt),log_type:"feeding",log_subtype:"formula_milk",value_number:state.actualMl,unit:"ml",remarks};
   const detail = `${state.actualMl} / ${bottle.preparedMl} ml · ${formatClock(bottle.preparedAt)}${bottle.medicineGiven ? t("medicineSuffix") : ""}`;
-  runSave("feeding",`iPad BB App 完成飲奶: 沖奶 ${bottle.preparedMl} ml, 實飲 ${state.actualMl} ml${bottle.medicineGiven ? ", 有餵藥" : ""}`,payload,() => clearActiveBottle(false),{icon:"bottle",savingTitle:t("feedSaving"),successTitle:t("feedSuccess"),detail});
+  if (!SHARED_ACTIVE_FEEDING_ENABLED || !bottle.sessionId) {
+    const finishedAt = new Date();
+    const remarks = ["Recorded through iPad BB App",`prepared_ml=${bottle.preparedMl}`,`actual_ml=${state.actualMl}`,`medicine_given=${bottle.medicineGiven ? "true" : "false"}`,`prepared_at=${toHongKongTimestamp(bottle.preparedAt)}`,`expires_at=${toHongKongTimestamp(bottle.expiresAt)}`].join("; ");
+    const payload = {event_at:toHongKongTimestamp(bottle.preparedAt),started_at:toHongKongTimestamp(bottle.preparedAt),ended_at:toHongKongTimestamp(finishedAt),log_type:"feeding",log_subtype:"formula_milk",value_number:state.actualMl,unit:"ml",remarks};
+    runSave("feeding",`iPad BB App 完成飲奶: 沖奶 ${bottle.preparedMl} ml, 實飲 ${state.actualMl}${bottle.medicineGiven ? ", 有餵藥" : ""}`,payload,() => removeActiveBottle(),{icon:"bottle",savingTitle:t("feedSaving"),successTitle:t("feedSuccess"),detail});
+    return;
+  }
+  if (state.saving) return;
+  state.saving = "feeding"; state.submitFlow = {status:"saving",icon:"bottle",savingTitle:t("feedSaving"),kind:"feeding"}; render();
+  try {
+    await activeFeedingApi.complete({session_id:bottle.sessionId,actual_ml:state.actualMl,ended_at:toHongKongTimestamp(new Date()),expected_updated_at:bottle.updatedAt});
+    removeActiveBottle();
+    state.saving = ""; state.submitFlow = {status:"success",icon:"check",successTitle:t("feedSuccess"),detail,kind:"feeding"};
+    await refreshData("save");
+  } catch (error) {
+    state.saving = ""; state.submitFlow = {status:"error",detail:error.message || t("saveFailed"),kind:"feeding"}; render();
+  }
 }
 
 function saveTemperature() {
@@ -1231,7 +1267,16 @@ function openFinishBottle() {
   render();
 }
 function closeFinishBottle() { state.finishOpen = false; render(); }
-function clearActiveBottle(notifyUser) { state.activeBottle = null; state.finishOpen = false; state.actualMl = state.preparedMl; localStorage.removeItem(STORAGE_KEYS.activeBottle); if (notifyUser) showNotice(t("timerCleared"),t("localTimerRemoved"),"success"); render(); }
+async function clearActiveBottle(notifyUser) {
+  const bottle = currentBottle();
+  if (SHARED_ACTIVE_FEEDING_ENABLED && bottle?.sessionId) {
+    try { await activeFeedingApi.cancel({session_id:bottle.sessionId,expected_updated_at:bottle.updatedAt}); }
+    catch (error) { showNotice(t("connectionFailed"),error.message || t("apiOffline"),"error"); return; }
+  }
+  removeActiveBottle();
+  if (notifyUser) showNotice(t("timerCleared"),t("localTimerRemoved"),"success");
+  render();
+}
 function setTab(tab) {
   state.activeTab = tab;
   render();
@@ -1317,6 +1362,11 @@ function toggleLanguage() { state.lang = state.lang === "zh" ? "en" : "zh"; loca
 function effectiveTime(scope) { return state.timeFollowing[scope] ? state.now : state.times[scope]; }
 function resetTimeFollowing(scope) { state.timeFollowing[scope] = true; state.times[scope] = new Date(); }
 
+function activeSessionToBottle(session) {
+  return {sessionId:session.session_id,preparedMl:Number(session.prepared_ml),medicineGiven:Boolean(session.medicine_given),preparedAt:parseTimestamp(session.prepared_at).toISOString(),expiresAt:parseTimestamp(session.expires_at).toISOString(),updatedAt:session.updated_at};
+}
+function persistActiveBottle() { if (state.activeBottle) localStorage.setItem(STORAGE_KEYS.activeBottle,JSON.stringify(state.activeBottle)); else localStorage.removeItem(STORAGE_KEYS.activeBottle); }
+function removeActiveBottle() { state.activeBottle = null; state.finishOpen = false; state.actualMl = state.preparedMl; persistActiveBottle(); }
 function currentBottle() { if (!state.activeBottle) return null; return {...state.activeBottle,preparedAt:new Date(state.activeBottle.preparedAt),expiresAt:new Date(state.activeBottle.expiresAt)}; }
 function activeBottlePreparedMl() { return currentBottle()?.preparedMl || state.preparedMl; }
 
